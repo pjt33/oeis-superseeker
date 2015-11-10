@@ -1,0 +1,26 @@
+# superproc6fry
+# CALLS LISTTOALGEQ
+# prim-ed Oct 30 2007
+# Feb 09 2009, changed libname path
+
+#with(share):
+#readshare(gfun,analysis):
+#libname := `/usr/njas/hisdir`,`/usr/local/tools/mapleV6/lib`;
+#libname := `/usr/njas/hisdir`,`/usr/local/tools/mapleV11/lib`;
+libname := `/home/njas/bin/gfun.lib.3.31`,`/usr/njas/hisdir`,libname:
+
+with(gfun):
+l0:=3*length(lis):
+t1:=listtoalgeq(lis,a(n),[ogf]):
+if  length(t1) < l0 then print(t1); fi:
+t1:=listtoalgeq(lis,a(n),[egf]):
+if  length(t1) < l0 then print(t1); fi:
+t1:=listtoalgeq(lis,a(n),[revogf]):
+if  length(t1) < l0 then print(t1); fi:
+t1:=listtoalgeq(lis,a(n),[revegf]):
+if  length(t1) < l0 then print(t1); fi:
+t1:=listtoalgeq(lis,a(n),[lgdogf]):
+if  length(t1) < l0 then print(t1); fi:
+t1:=listtoalgeq(lis,a(n),[lgdegf]):
+if  length(t1) < l0 then print(t1); fi:
+quit

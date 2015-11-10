@@ -1,0 +1,115 @@
+T001  the sequence itself
+T002  integers not in the sequence
+T003  sequence divided by the gcd of its elements
+T004  sequence divided by the gcd of its elements, from the 2nd term
+T005  sequence divided by the gcd of its elements, from the 3rd term
+T006  elements of odd index in the sequence
+T007  elements of even index in the sequence
+T008  sequence u[j]/(j-1)!
+T009  sequence u[j]*j
+T010  sequence u[j]/j!
+T011  sequence 2*u[j]
+T012  sequence 3*u[j]
+T013  coefficients of 1/Sn(z)^2
+T014  coefficients of Sn(z)^2
+T015  coefficients of 1/Sn(z)
+T016  coefficients of Sn(z)*(1+z)/(1-z)
+T017  coefficients of Sn(z)*(1-z)/(1+z)
+T018  sequence u[j+1]-u[j]
+T019  sequence u[j+2]-2*u[j+1]+u[j]
+T020  sequence u[j+3]-3*u[j+2]+3*u[j+1]-u[j]
+T021  coefficients of Sn(z)/(1-z)
+T022  coefficients of Sn(z)/(1-z)^2
+T023  coefficients of Sn(z)/(1-z)^3
+T024  sequence u[j]+u[j+1]
+T025  sequence u[j]+u[j+2]
+T026  coefficients of Sn(z)/(1+z)
+T027  coefficients of Sn(z)/(1+z^2)
+T028  sequence u[j]+u[j+1]+u[j+2]
+T029  coefficients of Sn(z)/(1+z+z^2)
+T030  sequence u[j+2]-u[j]
+T031  coefficients of Sn(z)/(1-z^2)
+T032  sequence u[j+2]-u[j+1]-u[j]
+T033  coefficients of Sn(z)/(1-z-z^2)
+T034  sequence u[j]+j
+T035  sequence u[j]+2
+T036  sequence u[j]+3
+T037  sequence u[j]-j
+T038  sequence u[j]-2
+T039  sequence u[j]-3
+T040  sequence u[j]+1
+T041  sequence u[j]-1
+T042  coefficients of Sn(z)/(1-z+z^2)
+T043  sequence u[j+2]-u[j+1]+u[j]
+T044  coefficients of Sn(z)/(1+z-z^2)
+T045  sequence u[j]+u[j+1]-u[j+2]
+T046  sequence u[j]+2*u[j+1]+u[j+2]
+T047  sequence u[j]+3*u[j+1]+3*u[j+2]+u[j+3]
+T048  coefficients of Sn(z)/(1+z)^2
+T049  coefficients of Sn(z)/(1+z)^3
+T050  jth coefficient of Sn(z)*(1-z)^j
+T051  jth coefficient of Sn(z)*(1+z)^j
+T052  jth coefficient of Sn(z)/(1-z)^j
+T053  jth coefficient of Sn(z)/(1+z)^j
+T054  coefficients of 1/En(z)^2
+T055  coefficients of En(z)^2
+T056  coefficients of 1/En(z)
+T057  coefficients of En(z)*(1+z)/(1-z)
+T058  coefficients of En(z)*(1-z)/(1+z)
+T059  sequence v[j+1]-v[j]
+T060  sequence v[j+2]-2*v[j+1]+v[j]
+T061  sequence v[j+3]-3*v[j+2]-3*v[j+1]+v[j]
+T062  coefficients of En(z)/(1-z)
+T063  coefficients of En(z)/(1-z)^2
+T064  coefficients of En(z)/(1-z)^3
+T065  sequence v[j]+v[j+1]
+T066  sequence v[j]+v[j+2]
+T067  coefficients of En(z)/(1+z)
+T068  coefficients of En(z)/(1+z^2)
+T069  sequence v[j]+v[j+1]+v[j+2]
+T070  coefficients of En(z)/(1+z+z^2)
+T071  sequence v[j+2]-v[j]
+T072  coefficients of En(z)/(1-z^2)
+T073  sequence v[j+2]-v[j+1]-v[j]
+T074  coefficients of En(z)/(1-z-z^2)
+T075  sequence v[j]+j
+T076  sequence v[j]+2
+T077  sequence v[j]+3
+T078  sequence v[j]-j
+T079  sequence v[j]-2
+T080  sequence v[j]-3
+T081  sequence u[j]+j!
+T082  sequence u[j]-j!
+T083  coefficients of En(z)/(1-z+z^2)
+T084  sequence v[j+2]-v[j+1]+v[j]
+T085  coefficients of En(z)/(1+z-z^2)
+T086  sequence v[j]+v[j+1]-v[j+2]
+T087  sequence v[j]+2*v[j+1]+v[j+2]
+T088  sequence v[j]+3*v[j+1]+3*v[j+2]+v[j+3]
+T089  coefficients of En(z)/(1+z)^2
+T090  coefficients of En(z)/(1+z)^3
+T091  jth coefficient of En(z)*(1-z)^j
+T092  jth coefficient of En(z)*(1+z)^j
+T093  jth coefficient of En(z)/(1-z)^j
+T094  jth coefficient of En(z)/(1+z)^j
+T095  coefficients of product( 1/(1-z^j)^u[j], j=1..inf )
+T096  inverse transform to T095, which was "coefficients of product( 1/(1-z^j)^u[j], j=1..inf )"
+T097  coefficients of product( 1/(1-z^j)^v[j], j=1..inf )
+T098  inverse transform to T097, which was "coefficients of product( 1/(1-z^j)^v[j], j=1..inf )"
+T099  sort terms, remove duplicates
+T100  binomial transform: b(n)=SUM C(n,k)a(k), k=0..n
+T101  inverse binomial transform: b(n)=SUM (-1)^(n-k)*C(n,k)*a(k), k=0..n
+T102  boustrophedon transform (see http://www.research.att.com/~njas/doc/bous.ps)
+T103  inverse boustrophedon transform (see http://www.research.att.com/~njas/doc/bous.ps)
+T104  Euler transform: define b by 1+SUM b(n)x^n = PRODUCT (1-x^n)^-a(n)
+T105  inverse Euler transform: define b by 1+SUM a(n)x^n = PRODUCT (1-x^n)^-b(n)
+T106  exponentiate: define b by 1 + EGF_B (x) = exp EGF_A (x)
+T107  exponential convolution, expand EGF(x)^2
+T108  invert: define b by 1+SUM b(n)x^n = 1/(1 - SUM a(n)x^n)
+T109  invert: define b by 1+SUM a(n)x^n = 1/(1 - SUM b(n)x^n)
+T110  log: define b by EGF of b = log (EGF of a)
+T111  Mobius: define b by b(n)=SUM mu(n/d)*a(d), d divides n
+T112  inverse Mobius: define b by b(n)=SUM a(d), d divides n
+T113  multiply all except leading terms by 2
+T114  Stirling-2 transform: b(n) = SUM S(n,k)a(k), k=0..n
+T115  Stirling-1 transform: b(n) = SUM s(n,k)a(k), k=0..n

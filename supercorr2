@@ -1,0 +1,60 @@
+# SUPERCORR2  looks for sequences closest in correlation 
+# Finds 3 closest that are greater than .999
+need:=.999:
+
+libname := `/usr/njas/hisdir`, libname:
+with(HISfry):
+with(stats):
+Digits:=16:
+interface(prettyprint=false):
+interface(quiet=true):
+interface(screenwidth=320):
+printlevel:=2:
+
+n0:=nops(lis):
+lisset:=convert(lis,set):
+if nops(lisset) = 1 then quit: fi:
+
+x1:=0: x2:=0: x3:=0:
+m1:=0: m2:=0: m3:=0:
+
+for i in indices(sequence) do
+m:=op(i):
+#print(i):
+s:=sequence[m]:
+#print(s):
+ns:=nops(s):
+# compute correlation
+if ns > n0 then
+v1:=lis:
+v2:=[seq(s[j],j=1..n0)]:
+else
+v1:=[seq(lis[j],j=1..ns)]:
+v2:=s:
+fi:
+v1set:=convert(v1,set):
+v2set:=convert(v2,set):
+if ( nops(v1set) > 1 and nops(v2set) > 1) then 			# if 1
+	x:=evalf(Rsquared(v1,v2)):
+if x > need then						# if 2
+#print(`next`,i,m,x);
+if x > x3 then							# if a
+if x > x2 then							# if b
+if x > x1 then							# if c
+	  x3:=x2: m3:=m2: x2:=x1: m2:=m1: x1:=x: m1:=m:
+	  else							# else c
+	  x3:=x2: m3:=m2: x2:=x: m2:=m: 
+	  fi:							# fi c
+	else							# else b
+	x3:=x: m3:=m:
+	fi:							# fi b
+fi:								# fi a
+fi:								# fi 2
+fi:								# fi 1 
+
+od:								# close main
+print(`CLOSEST (if any):`);
+if x1 > need then print(`HIT`, `AA`, m1+10000, x1 ): fi:
+if x2 > need then print(`HIT`, `AA`, m2+10000, x2 ): fi:
+if x3 > need then print(`HIT`, `AA`, m3+10000, x3 ): fi:
+quit

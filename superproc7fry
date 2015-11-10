@@ -1,0 +1,30 @@
+# superproc7fry:  initial processing of sequence
+# modified May 7 1997 for V.4
+# prim-ed Oct 30 2007
+
+troncfry:=proc(lis)
+local i,lnew;
+lnew:=lis;
+for i from 1 while length(lnew)>148 do
+lnew:= lnew[ 1 .. nops(lnew)-1 ] :
+od:
+lnew;
+end;
+
+lis:=troncfry(lis);
+#print(`lis`);
+interface(prettyprint=false):
+interface(quiet=true):
+interface(screenwidth=320):
+printlevel:=2:
+s:=convert(lis,set):
+m:=max(op(map(abs,lis))):
+l:=nops(lis):
+fort:=0:
+if m < 2^30 then fort:=1; fi:
+print(`CUT HERE`);
+print(`NVALS`,nops(s));
+print(`MAXVAL`,m);
+print(`NTERMS`,l);
+print(`F77TYPE`,fort);
+quit

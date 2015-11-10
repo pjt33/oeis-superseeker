@@ -1,0 +1,337 @@
+#!/bin/sh
+# hisP
+# Version for prim, Nov 06 2008
+
+# Program that automatically answers sequence queries
+# Written by N J A Sloane, Jan-June 1994
+# Modified 6.04.96, 4.23.98 Jan 27 1999
+# Dec 4 2000: calls hisarrange to put seqs into order with "best" ones first
+# Nov 03 2002: allows calls to retrieve a sequence by A-number
+# Jan 08 2003: added time stamp to reply
+# Include original subject line, Jan 08 2003
+# Changed "ex" to /bin/ex ; changed ex - to $ex -s ; Jun 10 2005
+# added awk script to strip off lines from spam guard - Jun 10 2005
+# Oct 26 2007: changed "usr" to "home", prim-ed the program
+# I decided to use grep for simplicity rather than gre,
+# and gawk everywhere rather than a mixture of awk and gawk
+# prim-ed Oct 27 2007
+# Version for prim, Nov 06 2008 - Nov 09 2008
+# Nov 11 2008: added "eval" to the search commands
+# Nov 12 2008: Further changes to search command at suggestion of Dave Applegate
+# Oct 29 2009: I removed the pipe through dehtml3P since it was introducing errors!
+#   For example, it would change A003136 to A0E6 
+
+# The file "header" has the boilerplate that goes at the end
+# The file "footer1" has the message that they get if sequence not found
+# The file "helper.txt" has the help file that they get
+# Calls hisAnumP if they are looking up a sequence number
+# Uses a simple shell program dehtml3 to change weird characters
+# Uses "getfrom" in bin
+
+# TO TEST THIS, I DO THE FOLLOWING
+
+# cp hisP testhis
+# rm jink*
+# set debug = 1 here
+# comment out the trap command
+# uncomment all the (many) "^#if.*debug" lines
+# make a file hiswork67 (say) containing a sequence, such as:
+# From njas
+# lookup 1 2 3 5 8 13 21 34
+# lookup 666665 555455 5667777
+# lookup 1 10 100 1000 10000 100000
+#
+# then type $ cat hiswork67 | testhis
+# look at the jink*** files to monitor progress thru the program
+#
+# remember to set debug = 0 before writing it back onto superasst!
+# and to uncomment the trap command
+# and to comment out the if debug lines
+
+PATH=:/home/njas/bin:/bin:/usr/bin:/usr/local/bin; export PATH
+
+# set parameters, file names etc.
+mach=`uname -n`
+case "$mach"
+in
+        "fry")
+	GETFROM=/home/njas/bin/getfrom
+        DEHTML3=/home/njas/bin/dehtml3F;;
+
+        "prim.research.att.com")
+	GETFROM=/home/njas/bin/getfrom2
+        DEHTML3=/home/njas/bin/dehtml3P;;
+
+esac
+
+ex=/bin/ex		# choose the good ex
+debug=0                 # set = 1 for debugging
+limreq=30		# no. of requests permitted
+limans=50		# set this to maximum responses to each sequence
+
+D1=/home/njas/bin	# define D1 to be this directory
+D2=/home/njas/tmp	# D2 is temp directory
+DA=/home/njas/www-etc/oeis
+DB=$DA/bin
+DD=$DA/search.db
+
+log=$D1/logP		# log is a log file
+#files=`echo /home/njas/gauss/hisdir/catfry23*`; export files
+files=/home/njas/gauss/hisdir/cat25; export files
+                        # "files" is big catalog, a copy of cat25
+stripped=/home/njas/gauss/hisdir/strippedfry
+		# "stripped" is the short catalog (produced by stripfry.1)
+shortbib=/home/njas/gauss/hisdir/shortbib	# plain version of bibliog
+shortbib3=/home/njas/gauss/hisdir/shortnew	# plain version of new refs
+header=$D1/header	# header is the boilerplate that actually goes at the end of the reply
+helper=$D1/helper.txt	# helper is help file to send them
+footer1=$D1/footer1	# message that they get if sequence not found
+orig=$D2/orig.$$	# define orig to be name of file which holds the original request
+req=$D2/request.$$	# define req to be name of file that holds the requested sequences
+tmp=$D2/$$.tmp		# tmp also holds the requested sequences
+tmp2=$D2/$$.tmp2	# another temp file
+tmp3=$D2/$$.tmp3        # another temp file
+tmp4=$D2/$$.tmp4        # another temp file
+trap "rm -f $orig $req $tmp $tmp2 $tmp3 $tmp4; exit" 0 1 2
+			# cleanup when done or interrupted
+date=`date`             # time stamp
+
+cd $D1
+
+###################################
+# capture the input
+###################################
+
+
+# change any weird characters; normalize the word "lookup",
+# strip off lines from spam guard
+# delete any html stuff
+
+# Oct 29 2009: I changed the next line:
+#cat | $DEHTML3 | gawk '
+cat | gawk '
+BEGIN { good = 1 }
+/Content preview:/ { good = 0; next}
+/Content analysis details:/ { good = 1; next }
+good == 0 {next }
+{ print }
+' | sed 's/[Ll][Oo][Oo][Kk]/look/
+           s/[Uu][Pp]/up/
+           s/look  *up/lookup/
+           s/=20$//
+           s/=$//
+	   s/^.*lookup/lookup/
+	   /lookup/s/<.*$//
+           /^</d
+           /^X-/d
+           /ail lookup/d' >$orig
+
+if [ "$debug" -eq 1 ]; then cp $orig jink0001; echo "at 0001"; fi
+
+###################################
+# log the request
+###################################
+(	echo 
+	echo "NEW MESSAGE:"
+	echo 
+	cat $orig 
+)  >> $log
+
+###################################
+# get return address
+###################################
+addr=`$GETFROM < $orig`
+case X$addr in
+  X) echo " " >> $log
+     echo "bad guy" >> $log
+     echo " " >> $log
+     exit 0;;
+#  Xarlin@iquest.com) echo " " >> $log
+#     echo "Arlin Anderson again" >> $log
+#     echo " " >> $log
+#     exit 0;;
+esac
+
+if [ "$debug" -eq 1 ]; then cp $orig jink0002; echo "at 0002"; fi
+if [ "$debug" -eq 1 ]; then echo "addr = " $addr; fi
+
+###################################
+# Capture the original subject line:
+###################################
+SUBJECT_0=`grep "^[Ss][Uu][Bb][Jj][Ee][Cc][Tt]" $orig` 
+
+
+###################################
+# build the reply
+###################################
+# is there a line that just says "lookup" and nothing else?
+if grep "^[Ll]ookup *$" $orig >/dev/null
+then
+#/usr/lib/sendmail -f sequences-reply "$addr" < $helper
+(echo "To: $addr"; echo "Subject: Help file for sequences@research.att.com";
+cat $helper ) | /usr/lib/sendmail -f sequences-reply "$addr"
+
+echo " " >> $log
+echo "I sent the helper file to $addr " >> $log
+echo " " >> $log
+exit 0
+fi
+
+if [ "$debug" -eq 1 ]; then cp $orig jink0003; echo "at 0003"; fi
+
+###################################
+# is format correct?
+###################################
+if grep lookup $orig >/dev/null
+then
+echo " " >/dev/null
+else 
+#/usr/lib/sendmail -f sequences-reply "$addr" < $helper
+(echo "To: $addr"; echo "Subject: Help file for sequences@research.att.com";
+cat $helper ) | /usr/lib/sendmail -f sequences-reply "$addr"
+
+echo " " >> $log
+echo "I sent the helper file to $addr " >> $log
+echo " " >> $log
+exit 0
+fi
+
+if [ "$debug" -eq 1 ]; then cp $orig jink0004; echo "at 0004"; fi
+
+###################################
+#check that there aren't too many requests
+###################################
+noreq=`grep lookup $orig | wc -l`
+if [ "$noreq" -gt "$limreq" ]
+then
+(echo "To: $addr"; echo "Subject: Too many lookups";
+echo "Sorry, only $limreq lookups allowed!";
+echo "To get the help file, send an empty message to sequences@research.att.com" ) | /usr/lib/sendmail -f sequences-reply "$addr"
+#echo Sorry, only $limreq lookups allowed! |
+#	upasname=sequences-reply mail "$addr"
+echo " " >> $log
+echo "Told them too many lookups! " >> $log
+echo " " >> $log
+exit 0
+fi
+
+if [ "$debug" -eq 1 ]; then cp $orig jink0005; echo "at 0005"; fi
+
+###################################
+# process the request
+###################################
+# pull out the lookup lines
+# 4/23/98 I removed the next line from inside the ex command following
+# g/-/s///g  But in the end i put it back
+
+# Oct 27 2007 I'm trying to get the ex script to run properly!
+cp $orig $req
+#cat $orig | awk ' /lookup/ {print }' >$req
+
+if [ "$debug" -eq 1 ]; then cp $orig jink0006; echo "at 0006"; fi
+if [ "$debug" -eq 1 ]; then cp $req jink0006req; fi
+
+$ex -s $req <<!
+g/^</d
+g/LOOKUP/s//lookup/g
+g/Lookup/s//lookup/g
+g/look up/s//lookup/g
+g/LOOK UP/s//lookup/g
+g/Look up/s//lookup/g
+v/lookup/d
+g/[Ss][Uu][Bb][Jj][Ee][Cc][Tt][: ]/s///
+g/^ /s/^  *//
+g/[abcdefghijmnqrstvzABCDEFGHIJKLMNOPQRSTUVWXYZ]/d
+g/lookup/s///
+w!
+q
+!
+
+if [ "$debug" -eq 1 ]; then cp $orig jink001; echo "at 001"; fi
+if [ "$debug" -eq 1 ]; then cp $req jink001req; fi
+
+###################################
+# Added Nov 03 2002. 
+# Are they looking up A-numbers?
+###################################
+#if grep "lookup  *A[0-9][0-9][0-9][0-9][0-9][0-9]" "$orig" >/dev/null
+if grep "lookup  *A[0-9]" "$orig" >/dev/null
+then
+if [ "$debug" -eq 1 ]; then cp $orig jink002; echo "at 002"; fi
+$D1/hisAnumP $addr $orig &
+sleep 1
+exit 0
+fi
+
+if [ "$debug" -eq 1 ]; then cp $req jink001a; echo "at 001a"; fi
+
+###################################
+# check for non-numeric characters in the lookup lines
+###################################
+# 4/23/98 I changed the next line by inserting \055 to allow minus signs
+# but in the end i took it out
+intern1=`cat $req | tr -d " 0123456789\012\055" `
+if [ -n "$intern1" ]
+then
+# echo "Sorry, lookup lines may contain only digits and blanks" |
+#	/usr/lib/sendmail -f sequences-reply "$addr"
+(echo "To: $addr"; echo "Subject: Illegal characters";
+echo "Sorry, lookup lines may contain only digits and blanks";
+echo "To get the help file, send an empty message to sequences@research.att.com" ) | /usr/lib/sendmail -f sequences-reply "$addr"
+
+echo "Told them only digits allowed! " >> $log
+exit 0
+fi
+
+#if [ "$debug" -eq 1 ]; then cp $req jink001b; echo "at 001b"; fi
+
+###################################
+# do further processing
+# David Applegate's version, Nov 12 2008:
+###################################
+cp $req $tmp2
+cat $tmp2 | sed 's/^  *//
+                 s/  *$//
+                 s/  */,/g' >$req
+#if [ "$debug" -eq 1 ]; then cp $req jink002; echo "at 002"; fi
+
+###################################
+# look up all seqs that match 
+###################################
+
+:>$tmp
+cat $req | while read ta; do
+echo "" >>$tmp
+echo "Matches (up to a limit of 50) found for \"$ta\"" >>$tmp
+echo "" >>$tmp
+/home/njas/www-etc/oeis/bin/search -f 3 -q -n 50 /home/njas/www-etc/oeis/search.db "$ta" >>$tmp
+echo "" >>$tmp
+done
+
+#if [ "$debug" -eq 1 ]; then cp $tmp jink003; echo "at 003"; fi
+
+cat $footer1 >>$tmp
+
+# save a copy
+(	echo 
+	echo "MY REPLY to $addr :" 
+	cat $tmp 
+	echo 
+)  >> $log
+
+# Add time stamp and subject line
+echo "Subject line of incoming message (if any): $SUBJECT_0" >>$tmp
+echo " " >>$tmp
+echo "Search was carried out on $date" >>$tmp
+
+# add the boilerplate:
+cat $header >>$tmp
+
+# send off the result:
+# $addr is email address, $tmp contains response
+#cat $tmp | /usr/lib/sendmail -f sequences-reply "$addr"
+
+(echo "To: $addr"; echo "Subject: Reply from On-Line Encyclopedia of Integer Sequences";
+cat $tmp ) | /usr/lib/sendmail -f sequences-reply "$addr"
+
+exit

@@ -1,0 +1,45 @@
+# superproc1
+# LOOK AT DIFFERENCE TRIANGLE
+# prim-ed Oct 30 2007
+
+difftriang:=proc(l) local i, j, t, pol:
+t[1]:=l:
+for i from 1 while constseq(t[i]) = 0 do
+	t[i+1]:=[]:
+		for j from 2 to nops(t[i]) do
+		t[i+1]:=[op(t[i+1]), t[i][j]-t[i][j-1] ]:
+					   od:
+				      od:
+if i <= nops(l)-1 then
+	pol:=0:
+	for j from 0 to i-1 do
+		pol := pol + binomial(n,j)*t[j+1][1]
+			    od: 
+	pol:=simplify(expand(pol)):
+		if length(pol) < 3*length(l) then
+	printf("%s\n",`good`);
+	printf("%s%d\n",`degree `, i-1);
+	printf("%s\n", `Polynomial is:`);
+	lprint(pol);
+		else
+	printf("%s\n",`bad`);
+	lprint(0);
+	lprint(0);
+		fi:
+
+else
+	printf("%s\n",`bad`);
+	lprint(0);
+	lprint(0);
+fi:
+end:
+
+constseq:=proc(l)
+local s:
+s:=convert(l,set):
+	if nops(s) = 1 then 1 else 0 fi:
+end:
+
+try1:=difftriang(lis):
+quit:
+

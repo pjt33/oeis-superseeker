@@ -1,0 +1,147 @@
+# Harm Derksen
+# hderksen@math.mit.edu
+# last change: 7/15/1999
+# prim-ed Oct 30 2007
+
+kernelopts(printbytes=false):
+
+`guesss/cfraction`:=proc(list,acc,x)
+local n,i,j,a,guess,val,lco,newguess,newval,newlco,result,newresult;
+n:=nops(list);
+a:=linalg[matrix](n,acc+n,0);
+for i from 1 to n do
+	for j from 1 to acc do
+		a[i,j]:=coeff(list[i],x,j-1);
+	od;
+	a[i,acc+i]:=1;
+od;
+a:=linalg[submatrix](linalg[gausselim](a),1..n,(acc+1)..(acc+n));
+for i from 1 to n do guess[i]:=linalg[row](a,i); od;
+result:=linalg[multiply](a,list);
+for i from 1 to n do
+	val[i]:=ldegree(result[i],x);
+	lco[i]:=tcoeff(result[i],x);
+od;
+while true do
+	newguess:=map(expand,linalg[scalarmul](guess[1],x^(val[2]-val[1])));
+	newresult:=expand(x^(val[2]-val[1])*result[1]);newval:=val[2];
+	newlco:=lco[1];val[n+1]:=val[n]+1;
+for i from 2 to n do
+	while (newval<val[i+1]) do
+		newresult:=rem(expand(newresult-newlco/lco[i]*result[i]*
+			x^(newval-val[i])),x^acc,x);
+newguess:=linalg[matadd](newguess,guess[i],1,-newlco/lco[i]*x^(newval-val[i]));
+		if newresult=0 then RETURN(op(newguess)) fi;
+		newval:=ldegree(newresult);
+		newlco:=tcoeff(newresult);
+	od;
+od;
+for i from 1 to n-1 do
+	result[i]:=result[i+1];
+	guess[i]:=eval(guess[i+1]);
+	val[i]:=val[i+1];
+	lco[i]:=lco[i+1];
+od;
+result[n]:=newresult;
+guess[n]:=eval(newguess);
+val[n]:=newval;
+lco[n]:=newlco;
+od;
+end:
+
+`guesss/monomials`:=proc(list,d,acc,x)
+local i,monsmall,mon,jj;
+if list=[] then RETURN([1]) fi;
+mon:=[];
+for i from 0 to d do
+	monsmall:=`guesss/monomials`(list[2..nops(list)],d-i,acc,x);
+	mon:=[op(mon),seq(rem(expand(list[1]^i*monsmall[jj]),x^acc,x),jj=1..nops(monsmall))];
+od;
+mon;
+end:
+
+`guesss/searchbinomial`:=proc(n)
+local i,j,c;
+c:=0; while(n>=binomial(2*c,c)) do c:=c+1 od;c:=c-1;
+for j from c by -1 to 1 do
+	i:=1;while (n>binomial(j+i,j)) do i:=i+1 od;
+	if n=binomial(j+i,j) then RETURN([i,j]) fi;
+od;
+end:
+
+`guesss/makelist`:=proc(f,n,d,acc,x)
+local g,list,i;
+g:=f;list:=[f];
+for i from 1 to n-1 do
+	g:=diff(g,x);list:=[op(list),expand(x^i*g)]
+od;
+`guesss/monomials`(list,d,acc,x);
+end:
+
+
+`guesss/formalmonomials`:=proc(list,d,x)
+local i,monsmall,mon,jj;
+if list=[] then RETURN([1]) fi;
+mon:=[];
+for i from 0 to d do
+	monsmall:=`guesss/formalmonomials`(list[2..nops(list)],d-i,x);
+	mon:=[op(mon),seq(expand(list[1]^i*monsmall[jj]),jj=1..nops(monsmall))];
+od;
+mon;
+end:
+
+
+`guesss/makeformallist`:=proc(f,n,d,x)
+local g,list,i;
+g:=f;list:=[f];
+for i from 1 to n-1 do
+	g:=diff(g,x);list:=[op(list),expand(x^i*g)]
+od;
+`guesss/formalmonomials`(list,d,acc,x);
+end:
+
+# GUESS Sequence
+guesss:=proc()
+local sequ,i,F,j,jj,n,f,g,polyrel,guess,level,lisst,result,eqns,solutions,var,pq,
+	numextension,x;
+sequ:=args[1];
+printf("%s\n",`CUT`);
+if nargs>1 then
+	numextension:=args[2]
+else
+	numextension:=7;
+fi;
+n:=nops(sequ);
+for level from 2 to trunc(n/2) do
+pq:=`guesss/searchbinomial`(level);
+f:=sum(sequ[j]*x^(j-1),j=1..(n-1));
+lisst:=`guesss/makelist`(f,pq[1],pq[2],n-1,x);
+polyrel:=`guesss/cfraction`(lisst,n-1,x);
+g:=f+sum(guess[j]*x^(n-2+j),j=1..numextension);
+lisst:=`guesss/makelist`(g,pq[1],pq[2],n+numextension-1,x);
+result:=expand(sum(lisst[j]*polyrel[j],j=1..level));
+eqns:={seq(coeff(result,x,jj),jj=(n-1)..(n+numextension-2))};
+var:={seq(guess[jj],jj=1..numextension)};
+solutions:=solve(eqns,var);
+solutions:=subs(solutions,[seq(guess[jj],jj=1..numextension)]);
+if solutions[1]=sequ[n] then 
+lisst:=`guesss/makeformallist`(F(x),pq[1],pq[2],x);
+printf("%s\n",`SUCCESS`);
+printf("%s\n",`Guesss suggests that the generating function  F(x) `);
+printf("%s\n",`may satisfy the following algebraic or differential equation:`);
+printf("%s\n",` `);
+lprint(sum(polyrel[i]*lisst[i],i=1..nops(lisst))=0);
+printf("%s\n",` `);
+printf("%s\n",`If this is correct the next 6 numbers in the sequence are:`);
+printf("%s\n",` `);
+lprint([op(2..numextension,solutions)]);
+printf("%s\n",` `);
+RETURN(); fi;
+od;
+printf("%s\n",`FAILED`);
+RETURN();
+end:
+
+guesss(lis);
+
+quit;

@@ -1,0 +1,336 @@
+*************************************************************
+   THIS IS THE HELP FILE FOR SUPERSEEKER
+*************************************************************
+
+Greetings from "superseeker".   This program will accept a
+sequence of integers and try very hard to find an explanation.
+
+
+Superseeker makes use of many things, some of which are:
+
+1. The On-Line Encyclopedia of Integer Sequences (or OEIS)
+                   N. J. A. Sloane
+        AT&T Research Labs, Florham Park, NJ 07932-0971 USA
+- see http://www.research.att.com/~njas/sequences/Seis.html
+
+2. The "gfun" Maple package of Bruno Salvy and Paul Zimmermann.
+
+3. A Mathematica program from Olivier Gerard to carry out various
+sequence transformations.
+
+4. Harm Derksen's program "guesss", which uses Pade'-Hermite approximations
+- see http://www.maplesoft.com/CyberMath/share/guesss.html.
+That algorithm is described in:
+An algorithm to compute generalized Pade'-Hermite forms,
+Report 9403 (1994), Dept. of Math., Catholic University Nijmegen
+(available from http://www.math.lsa.umich.edu/~hderksen/preprints/pade.ps).
+
+5. Christian Kratthentaler's Mathematica program Rate which tries to 
+guess a closed form for a sequence ("rate" is "guess" in German).
+For a description of Rate, see
+http://radon.mat.univie.ac.at/People/kratt/rate/rate.html.
+
+6. John Linderman's program CheckSeq.pl which checks if
+there is a partial overlap between a sequence and any
+sequence in the database.
+
+7. Various other programs.
+
+
+INSTRUCTIONS:
+To submit a sequence to superseeker, send mail to
+
+superseeker@research.att.com
+
+containing a single line of the form
+
+   lookup 1 2 4 6 10 14 20 26 36 46 60 74 94 114
+
+in the body of the message. In the Subject line, say "none".
+
+The terms must be separated by spaces (not commas).
+It is best to give between 10 and 20 terms.
+
+Only one request may be submitted at a time, and (since this
+program does some serious computing), only one request per user
+per hour.  (There is a list of special users who are exempt from
+this restriction.  If you feel you have a genuine need to be
+placed on this list, send mail to njas@research.att.com, giving
+your reasons!)
+
+[To simply look up sequences in the Encyclopedia, it is 
+more efficient to use either the email server at
+   
+   sequences@research.att.com
+
+- send an empty email message to that address to get instructions-
+or the Web server at
+
+   http://www.research.att.com/~njas/sequences/  ]
+
+
+
+RECOMMENDATIONS:
+. Start from the beginning of the sequence (although of course
+	keep in mind that different people may define the zero-th
+	term (say) in different ways
+
+. Minus signs (if any) should be INCLUDED, since most of the
+	programs will make use of them
+
+. If you receive 30 matches from the Encyclopedia, try again
+	giving more terms
+
+. If you give too many terms, it will tie up my machine for a long
+        time, and my boss will be unhappy
+
+. For an array of numbers, try looking up the individual
+	rows, columns or diagonals, whichever seem appropriate
+
+. The program is (mostly) concerned only with infinite sequences
+
+. The program only handles integers.  (For a sequence of
+	rationals, try the sequences of numerators and
+	denominators separately.)
+
+. The word "lookup" may only appear once in the message
+        The "Subject" line is thrown away.
+
+
+TESTS USED
+
+The program will apply some or all of the following tests.
+(The program gives up once it has found a sufficient number
+of possible explanations.  The more trivial the sequence,
+the less time the program will spend studying it.
+Also some of these tests are not applicable to all sequences.
+Only potentially useful results are reported.)
+
+. Look up in the On-Line Encyclopedia both the sequence and the sequence
+	with the first term omitted.
+    	(The reply will report all matches found, up to a limit of 30.)
+
+. Test if a(n) is a polynomial in n  [a(n) denotes the n-th term]
+    	In other words, are the differences of some order constant?
+
+. Test if the differences of some order are periodic.
+    	(Suppose the kth order differences are  d(1), ...,d(n).
+    	They are said to be periodic if there is a number p, the period,
+    	with 1 <= p <= n-2, such that d(i) = d(j) whenever i = j (mod p).)
+
+. Test if any row of the difference table of some depth is essentially
+    	constant.  This detects such sequences as 4^n - n^4.
+	(Let the usual difference table be
+            a(0), a(1), a(2), ...
+		b(0), b(1), ...
+           	    c(0), c(1), ...
+              		....
+	This is the difference table of depth 1. The table of depth 2
+	has as top row
+		a(0), b(0), c(0), ...;
+	and so on.)
+
+. For a 2-valued sequence, compute the six characteristic sequences
+	associated with the sequence and look them up in the OEIS.
+        (Suppose the sequence takes only the values X and Y.
+        The six characteristic sequences, all equivalent to the original, are:
+           replace X,Y by 1,2; by 2,1;
+           the positions of the X's, of the Y's;
+           the run lengths;
+           and the derivative, i.e. the positions where the sequence changes.)
+
+. Form the generating functions (g.f.) for the sequence for each of
+	the following 6 types:
+
+	ogf	ordinary generating function
+	egf	exponential generating function
+	revogf	reversion of ordinary generating function
+	revegf	reversion of exponential generating function
+	lgdogf	logarithmic derivative of ordinary generating function
+	lgdegf	logarithmic derivative of exponential generating function
+
+    	and attempt to represent them as rational functions,
+    	hypergeometric series, or the solution to a linear differential
+    	equation with polynomial coefficients.
+
+. Look for a linear recurrence with polynomial coefficients for the
+    	coefficients of the above 6 types of g.f.'s.
+
+. Look for a polynomial equation in y and x for the g.f. y(x) of each
+    	of the above 6 types.
+
+. Apply the transformations listed below to the sequence and look up
+  	the result in the OEIS.  Stop when 50 matches have been found.
+
+. Test if the sequence is a Beatty sequence.
+	  (A Beatty sequence is one in which the n-th term is [nz],
+	where z is irrational.  The complementary sequence is [ny],
+	where 1/x + 1/y = 1.  Refs: N. J. A. Sloane,
+	Handbook of Integer Sequences, 1973, p. 29; R. Honsberger,
+	Ingenuity in Mathematics, 1970, p. 93.  If this is a Beatty
+	sequence the value given for z will produce the given terms,
+	but is very far from being unique.)
+
+
+LIST OF TRANSFORMATIONS THAT MAY BE APPLIED
+
+Abbreviations used in the following list of transformations:
+u[j]	=	j-th term of the sequence
+v[j]	=	u[j]/(j-1)!
+Sn(z)	=	ordinary generating function
+En(z)	=	exponential generating function
+
+T001  the sequence itself
+T002  integers not in the sequence
+T003  sequence divided by the gcd of its elements
+T004  sequence divided by the gcd of its elements, from the 2nd term
+T005  sequence divided by the gcd of its elements, from the 3rd term
+T006  elements of odd index in the sequence
+T007  elements of even index in the sequence
+T008  sequence u[j]/(j-1)!
+T009  sequence u[j]*j
+T010  sequence u[j]/j!
+T011  sequence 2*u[j]
+T012  sequence 3*u[j]
+T013  coefficients of 1/Sn(z)^2
+T014  coefficients of Sn(z)^2
+T015  coefficients of 1/Sn(z)
+T016  coefficients of Sn(z)*(1+z)/(1-z)
+T017  coefficients of Sn(z)*(1-z)/(1+z)
+T018  sequence u[j+1]-u[j]
+T019  sequence u[j+2]-2*u[j+1]+u[j]
+T020  sequence u[j+3]-3*u[j+2]+3*u[j+1]-u[j]
+T021  coefficients of Sn(z)/(1-z)
+T022  coefficients of Sn(z)/(1-z)^2
+T023  coefficients of Sn(z)/(1-z)^3
+T024  sequence u[j]+u[j+1]
+T025  sequence u[j]+u[j+2]
+T026  coefficients of Sn(z)/(1+z)
+T027  coefficients of Sn(z)/(1+z^2)
+T028  sequence u[j]+u[j+1]+u[j+2]
+T029  coefficients of Sn(z)/(1+z+z^2)
+T030  sequence u[j+2]-u[j]
+T031  coefficients of Sn(z)/(1-z^2)
+T032  sequence u[j+2]-u[j+1]-u[j]
+T033  coefficients of Sn(z)/(1-z-z^2)
+T034  sequence u[j]+j
+T035  sequence u[j]+2
+T036  sequence u[j]+3
+T037  sequence u[j]-j
+T038  sequence u[j]-2
+T039  sequence u[j]-3
+T040  sequence u[j]+1
+T041  sequence u[j]-1
+T042  coefficients of Sn(z)/(1-z+z^2)
+T043  sequence u[j+2]-u[j+1]+u[j]
+T044  coefficients of Sn(z)/(1+z-z^2)
+T045  sequence u[j]+u[j+1]-u[j+2]
+T046  sequence u[j]+2*u[j+1]+u[j+2]
+T047  sequence u[j]+3*u[j+1]+3*u[j+2]+u[j+3]
+T048  coefficients of Sn(z)/(1+z)^2
+T049  coefficients of Sn(z)/(1+z)^3
+T050  jth coefficient of Sn(z)*(1-z)^j
+T051  jth coefficient of Sn(z)*(1+z)^j
+T052  jth coefficient of Sn(z)/(1-z)^j
+T053  jth coefficient of Sn(z)/(1+z)^j
+T054  coefficients of 1/En(z)^2
+T055  coefficients of En(z)^2
+T056  coefficients of 1/En(z)
+T057  coefficients of En(z)*(1+z)/(1-z)
+T058  coefficients of En(z)*(1-z)/(1+z)
+T059  sequence v[j+1]-v[j]
+T060  sequence v[j+2]-2*v[j+1]+v[j]
+T061  sequence v[j+3]-3*v[j+2]-3*v[j+1]+v[j]
+T062  coefficients of En(z)/(1-z)
+T063  coefficients of En(z)/(1-z)^2
+T064  coefficients of En(z)/(1-z)^3
+T065  sequence v[j]+v[j+1]
+T066  sequence v[j]+v[j+2]
+T067  coefficients of En(z)/(1+z)
+T068  coefficients of En(z)/(1+z^2)
+T069  sequence v[j]+v[j+1]+v[j+2]
+T070  coefficients of En(z)/(1+z+z^2)
+T071  sequence v[j+2]-v[j]
+T072  coefficients of En(z)/(1-z^2)
+T073  sequence v[j+2]-v[j+1]-v[j]
+T074  coefficients of En(z)/(1-z-z^2)
+T075  sequence v[j]+j
+T076  sequence v[j]+2
+T077  sequence v[j]+3
+T078  sequence v[j]-j
+T079  sequence v[j]-2
+T080  sequence v[j]-3
+T081  sequence u[j]+j!
+T082  sequence u[j]-j!
+T083  coefficients of En(z)/(1-z+z^2)
+T084  sequence v[j+2]-v[j+1]+v[j]
+T085  coefficients of En(z)/(1+z-z^2)
+T086  sequence v[j]+v[j+1]-v[j+2]
+T087  sequence v[j]+2*v[j+1]+v[j+2]
+T088  sequence v[j]+3*v[j+1]+3*v[j+2]+v[j+3]
+T089  coefficients of En(z)/(1+z)^2
+T090  coefficients of En(z)/(1+z)^3
+T091  jth coefficient of En(z)*(1-z)^j
+T092  jth coefficient of En(z)*(1+z)^j
+T093  jth coefficient of En(z)/(1-z)^j
+T094  jth coefficient of En(z)/(1+z)^j
+T095  coefficients of product( 1/(1-z^j)^u[j], j=1..inf )
+T096  inverse transform to T095, which was "coefficients of product( 1/(1-z^j)^u[j], j=1..inf )"
+T097  coefficients of product( 1/(1-z^j)^v[j], j=1..inf )
+T098  inverse transform to T097, which was "coefficients of product( 1/(1-z^j)^v[j], j=1..inf )"
+T099  sort terms, remove duplicates
+T100  binomial transform: b(n)=SUM C(n,k)a(k), k=0..n
+T101  inverse binomial transform: b(n)=SUM (-1)^(n-k)*C(n,k)*a(k), k=0..n
+T102  boustrophedon transform (see http://www.research.att.com/~njas/doc/bous.ps)
+T103  inverse boustrophedon transform (see http://www.research.att.com/~njas/doc/bous.ps)
+T104  Euler transform: define b by 1+SUM b(n)x^n = PRODUCT (1-x^n)^-a(n)
+T105  inverse Euler transform: define b by 1+SUM a(n)x^n = PRODUCT (1-x^n)^-b(n)
+T106  exponentiate: define b by 1 + EGF_B (x) = exp EGF_A (x)
+T107  exponential convolution, expand EGF(x)^2
+T108  invert: define b by 1+SUM b(n)x^n = 1/(1 - SUM a(n)x^n)
+T109  invert: define b by 1+SUM a(n)x^n = 1/(1 - SUM b(n)x^n)
+T110  log: define b by EGF of b = log (EGF of a)
+T111  Mobius: define b by b(n)=SUM mu(n/d)*a(d), d divides n
+T112  inverse Mobius: define b by b(n)=SUM a(d), d divides n
+T113  multiply all except leading terms by 2
+T114  Stirling-2 transform: b(n) = SUM S(n,k)a(k), k=0..n
+T115  Stirling-1 transform: b(n) = SUM s(n,k)a(k), k=0..n
+
+
+COMMON ERRORS WHEN USING THIS EMAIL SERVICE:
+Make sure that
+the word "lookup" does not appear in the message in the same line as
+any non-numeric characters.  Make sure that the lookup line
+has the form
+
+   lookup 1 4 9 16 25                     GOOD!
+
+and avoid any lines that say things like:
+
+Subject: lookup please                                        BAD!
+Subject: lookup                                               BAD!
+To: lookup <sequences@research.att.com>                       BAD!
+   lookup 1,4,9,16,...      [NO COMMAS OR DOTS ARE ALLOWED!]  BAD!
+   lookup 1 4 9 16 ?                                          BAD!
+
+In a submission to superseeker the word "lookup" may only
+appear once in the entire message.
+
+                 ***********************
+
+THE FORMAT USED IN THE DATABASE is described in the web page
+http://www.research.att.com/~njas/sequences/eishelp1.html
+
+FOR A SIMPLE AND FAST LOOKUP, try sequences@research.att.com
+- send a blank message for instructions
+
+TO CONTRIBUTE A NEW SEQUENCE OR COMMENT use the web page
+http://www.research.att.com/~njas/sequences/Submit.html
+
+TO LOOKUP SEQUENCES USING THE WEB go to
+http://www.research.att.com/~njas/sequences/index.html
+
+FOR MORE INFORMATION ABOUT
+      The On-Line Encyclopedia of Integer Sequences
+see the Welcome page
+http://www.research.att.com/~njas/sequences/Seis.html

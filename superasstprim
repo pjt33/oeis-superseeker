@@ -1,0 +1,2082 @@
+#!/bin/sh
+
+###################################################
+#                                                 #
+#         superasstprim                            #
+#                                                 #
+###################################################
+
+# Program that automatically answers sequence queries,
+#   trying very hard to find an explanation 
+# N. J. A. Sloane 5/16/94
+
+# Fry version 7/12/96
+# 5/97 I have now disconnected the beatty test because it was broken
+# and also (5/7/97) the findhard test because it takes too long
+# 2/28/98 New version of superasstfry replacing findhard with
+# Olivier Gerard's mathematica code and some clever shell programming
+# July 21 1999 I am restoring the Beatty sequence test, but only the "beatty0" part
+# Aug 1 1999  Adding "agrep"
+# Aug 2 Adding guesss
+# Aug 4 Adding RATE
+# 11.26.99 Added "To" lines etc to replies
+# Dec 4 2000: return matches with best ones first
+# Feb 20 2001: always do the "hard" search
+# Aug 13 2002 changing files called "work" to "superwork"
+# Oct 20 2003 Added John Linderman's partial overlap checker, CheckSeq.pl
+# Jul 01 2004 Added tests to see if can match the difference
+#   sequence of any sequence in the OEIS
+# Jun 06 2005 Switched over to good version of ex
+# Jan 03 2007: switched from maple6 to maple9.5
+# Jan 04 2007: switched back, it wasn't working
+# Oct 27 2007: started work on making this compatible with prim
+# Oct 30 2007: Changed "limit" to "ulimit"; changed to $MAPLE, $MATH
+# Nov 02 2007: changed libname command in subprocedures to make gfun work
+# Nov 09 2008: prim version
+# Nov 17 2008: with huge amount of help from Dave Applegate,
+#              added queueing commands
+# Feb 09 2009: changed libpath in the superproc2prim etc files
+# Feb 09 2009: corrected a serious bug in superproc2prim
+
+# TO STUDY A TOUGH SEQUENCE, change maptime = 1000 to maptime = 100000
+#   and set tough = 1 below
+
+#######################################################
+#
+# TO TEST THIS, I DO THE FOLLOWING
+#
+#######################################################
+
+# cp superasstprim testasst
+# rm jonk*
+# IMPORTANT! comment out lines 234-242 (the lockfile stuff) and the trap in line 248
+# set debug = 1 in testasst (at about line 131)
+# make a file superwork66 (say) containing a sequence, such as:
+# f ,1,1,2,3,5,8,13,21,34,
+# make an executable file, superwork1 (say), containing 2 lines:
+#	 cat superwork66 | sed '1q' >superwork6
+#	 testasst njas superwork6
+# or     superasstprim njas superwork6
+#
+# then type superwork1
+# look at the jonk*** files to monitor progress thru the program
+#
+# remember to set debug = 0 before writing it back onto superasstfry!
+
+#######################################################
+#
+# SUBPROGRAMS AND FILES CALLED (in order) (grep for "CALLS")
+#
+#######################################################
+
+# The program superhis reads the mail, then calls this program to
+#	do the hard stuff.
+
+# superfoot*	=	various text files read in at times
+# superproc7fry	=	Maple prog that does initial processing of seq. 
+# superfoot0	=	boilerplate = standard footer 
+# superfoot1	=	text
+# footer2 	= 	boilerplate used if sequence is not in table
+# superproc1	=	look at differences (a Maple subroutine) 
+# superprocfan	=	compute multiple order difference table  (Maple)
+# superproc8.f	=	Fortran program that checks if diffs are periodic
+# proc8 or proc8P (prim) = executable of same
+# superproc9.f	=	Fortran program that gets char fns of binary sequences
+# proc9 or proc9P (prim) = executable of same
+# superproc2fry	=	call guessgf (Maple)
+# superproc2prim	=	call guessgf (Maple)
+# superproc4fry	=	call listtorec (Maple)
+# superproc4prim	=	call listtorec (Maple)
+# superproc6fry	=	call listtoalgeq (Maple)
+# superproc6prim	=	call listtoalgeq (Maple)
+# superguesss	=	my version of Harm Derksen's guesss Maple program  
+# superrate.m	=	my version of rate.m   (Mma)
+# NOT USED superproc3fry	=	call findhard
+# seqtranslib.m is Olivier Gerard's program used by superasstfry (Mma)
+# NOT USED superproc5.f	=	fortran program to decode output of findhard
+# NOT USED proc5	=	executable of same
+# the file "supertrans" has list of transforms used
+# superfoot2 	=	text
+# NOT USED supernearfry	=	look for nearest in L1 norm seqs
+# superbeattyfry	=	test for Beatty seq. (Maple)
+# superbeattyprim	=	test for Beatty seq. (Maple)
+# superfootb 	=	text for beatty
+# hisarrange	=	shell (mostly awk) program that puts core seqs first, etc.
+# qk_fast	=	used by the "transformations" lookup
+# qk_fast_drip	=	used by the "transformations" lookup in the difference table
+
+# these do not appear to be used at present:
+# supercorr	=	look for nearest in correlation seqs
+# superproc10	=	computes first batch of transforms
+# superproc11	=	computes 2nd batch of transforms
+# obsolete now: HISfry in $H/hisdir is Maple script with transformations T___ used
+
+#######################################################
+#
+# SET PARAMETERS, FILE NAMES ETC.
+#
+#######################################################
+
+# ignore SIGHUP (which might occur when the calling program exits,
+# depending on details of mail delivery)
+trap ""  1
+
+# set path:
+PATH=:/home/njas/bin:/bin:/usr/bin:/usr/local/bin:/usr/common/bin/; export PATH
+
+ex=/bin/ex
+#Maple=/usr/local/bin/maple8   # set version of Maple
+#Maple=/usr/local/bin/maple7   # set version of Maple
+#Maple=/usr/local/bin/maple6   # set version of Maple
+#Maple=/usr/local/bin/maple9.5   # set version of Maple
+debug=0			# don't print info (0), or do (1) - for debugging
+tough=1			# set equal to 1 if want to keep analyzing even if seq in table
+			# Feb 2001 default is now 1
+maptime=1000		# max time in secs allowed for the big Maple jobs
+limans=50                # set this to maximum responses to each sequence
+			#  when looking it up in the table
+nocmin=9		# min no of chars needed in 2nd part of prog
+nowmin=3		# min no of words needed in 2nd part of prog
+
+D1=/home/njas/bin	# define D1 to be this directory
+D2=/home/njas/tmp	# put temp files in here
+DA=/home/njas/www-etc/oeis
+DB=$DA/bin
+DD=$DA/search.db
+LOCKWAIT=/usr/bin/lockfile
+LOCKFILE=/home/njas/tmp/super.lock
+
+log=$D1/superlogP	# log is a log file
+#files=`echo /home/njas/gauss/hisdir/catfry23*`; export files
+files=/home/njas/gauss/hisdir/cat25; export files
+			# "files" is big catalog, a copy of cat25
+stripped=/home/njas/gauss/hisdir/strippedfry
+			# "stripped" is short catalog (produced by stripfry.1)
+			# - note the minus signs have been removed
+dripped=/home/njas/gauss/hisdir/drippedfry
+			# "dripped" is short catalog of differences (from stripfry.1)
+			# based on strippedfry_signs
+			# - note the minus signs have been removed
+shortbib=/home/njas/gauss/hisdir/shortbib	# plain version of bibliog
+shortbib3=/home/njas/gauss/hisdir/shortnew	# plain version of new refs
+header=$D1/assthead	# header is the header for my reply
+footer2=$D1/footer2	# asks them to send seq, if not in table
+addr=$1			# addr is return address
+req=$2			# req holds the requested sequence in the f ,1,2,3,4, format
+			# (with signs)
+reqa=$D2/$$.reqa 	# reqa will hold the requested sequence in the f ,1,2,3,4, format
+			# (without signs)
+fort=$D2/$$.fort
+ans=$D2/$$.ans		# ans holds the reply
+tmp=$D2/$$.tmp		# tmp will also hold the requested sequence (without signs)
+tmp2=$D2/$$.tmp2	# another temp file
+tmp3=$D2/$$.tmp3	# another temp file
+tmp4=$D2/$$.tmp4	# another temp file
+tmp5=$D2/$$.tmp5	# another temp file
+tmp6=$D2/$$.tmp6	# another temp file
+
+# other variables:
+# $addr		=	return address
+# $intable	=	1 iff original sequence is in the table
+intable=0
+# $ntable	=	no. of times it was found in the main table
+# $nvals	=	no. of values taken by seq.
+# $maxval	=	max. abs. value in seq.
+# $nterms	=	no. of terms in seq.
+# $periodic	=	1 iff periodic
+# $debug	=	1 to get debugging printouts, 0 if not
+# $f77type	=	1 if fortran can read it, 0 else
+
+mach=`uname -n`
+case "$mach"
+in
+        "fry") 
+	AGREP=agrep
+	BEATTY=$D1/superbeattyfry
+	MAPLE=/usr/local/bin/maple6
+	MATH=/usr/local/bin/math
+	PROC2=$D1/superproc2fry
+	PROC4=$D1/superproc4fry
+	PROC6=$D1/superproc6fry
+	PROC8=$D1/proc8
+	PROC9=$D1/proc9;;
+
+        "prim.research.att.com") 
+	AGREP=/home/njas/bin/agrep
+	BEATTY=$D1/superbeattyprim
+	MAPLE=/usr/local/bin/maple
+	MATH=/usr/common/bin/math
+	PROC2=$D1/superproc2prim
+	PROC4=$D1/superproc4prim
+	PROC6=$D1/superproc6prim
+	PROC8=$D1/proc8P
+	PROC9=$D1/proc9P;;
+
+esac
+
+##################################################################
+#  Wait for lockfile if necessary
+##################################################################
+### In the lockfile command
+### -60 means wait 1 minute between attempts
+### -r 60 means give up after 1 hour of attempts (60 retries)
+### -l 1800 means that if a lock is 30 minutes old, override it
+### -s 60  means to wait 1 minute after overriding a lock
+###
+### Doing it in the while loop means that if superseeker can't get the
+### lock, it sends you email, but continues to try to get the lock.  You
+### can react to the email by fixing the lock problem, or by killing the
+### superseeker process.
+###
+### The trap command should remove the lock if superasstprim exits,
+### or is killed (but not with kill -9 since that doesn't let the process do
+### anything else).
+
+### JUL 21 2009: removed "-l 1800" from 2 LOCKWAIT commands below.  Stale locks
+###    are no longer overridden.
+
+### For debugging, comment out the next 9 lines
+if ! $LOCKWAIT -60 -r 60 -s 60 $LOCKFILE > /dev/null 2>&1; then
+  (echo "To: njas@research.att.com david@research.att.com"; echo "Subject: We have a superseeker lock problem";
+    echo "Process id is $$"; echo "Probably you should either";
+    echo "rm -f $LOCKFILE"; echo "or"; echo "kill $$";
+  ) | /usr/lib/sendmail -f superseeker njas@research.att.com david@research.att.com
+  if ! $LOCKWAIT -60 -r -1 -s 60 $LOCKFILE > /dev/null 2>&1; then
+    exit 0
+  fi
+fi
+
+#trap "rm -f $LOCKFILE; exit 0" 0 2 3 15
+			# debugging cleanup when done or interrupted
+### For debugging, comment out the next line
+trap "rm -f $req $reqa $ans $fort $tmp $tmp2 $tmp3 $tmp4 $tmp5 $tmp6 $LOCKFILE; exit 0" 0 2 3 15
+			# normal cleanup when done or interrupted
+
+#######################################################
+#
+#        START WORK
+#
+#######################################################
+
+cd $D1
+
+
+# WE ENTER WITH THE REQUEST (with signs) IN $req,
+#	held in  f ,1,2,3,4,5,  format
+
+if [ "$debug" -eq 1 ]; then cp $req jonk001; echo "at 001, initial req."; fi
+
+# delete minus signs, put into $tmp and $reqa
+cat $req | tr -d '\055' >$tmp
+cp $tmp $reqa
+if [ "$debug" -eq 1 ]; then cp $tmp jonk002; echo "at 002, - signs gone"; fi
+
+# see if it contains a 0 term
+if grep ",0," $req >/dev/null
+then
+zterm=0    #zterm=0 means it contains a 0
+else
+zterm=1    #zterm=1 means it does not contain a 0
+fi
+
+
+############################################
+#                                          #
+#        CONVERT $req TO MAPLE FORMAT      #
+#                                          #
+############################################
+
+$ex -s $req <<!
+v/f/d
+s/^.../lis:=[ /
+s/.$/]:/
+w
+q
+!
+
+lis_maple=`cat $req`
+
+if [ "$debug" -eq 1 ]; then cp $req jonk002a; echo "at 002a- Maple fmt"; fi
+
+######################################
+#                                    #
+#        PUT HEADER ON MESSAGE       #
+#                                    #
+######################################
+
+sed 's/lis:=/Report on /' <$req >>$ans
+echo "Many tests are carried out, but only potentially useful information
+(if any) is reported here." >>$ans
+echo >>$ans
+
+# IS SEQUENCE TRIVIAL?  CALLS superproc7fry
+# which calls Maple
+
+# temp
+#cp $req jonkjonk1
+# temp
+#echo "$addr" > jonkjonk3
+# temp
+#printenv >jonkjonk4
+# temp
+#set >jonkjonk5
+
+cat $req $D1/superproc7fry | $MAPLE > $tmp4
+#echo "lis := [1,10,20,30,40];"  | $MAPLE > jonkjonk2
+
+if [ "$debug" -eq 1 ]; then cp $tmp4 jonk003; echo "at 003, thru Maple"; fi
+
+# process the output
+$ex -s $tmp4 <<!
+1,/CUT/d
+g/^>/d
+g/^#/d
+g/^\$/d
+\$a
+
+.
+g/^byt/d
+g/,/s// /g
+w
+q
+!
+# at this point $tmp4 contains the results from Maple
+if [ "$debug" -eq 1 ]; then cp $tmp4 jonk004; echo "at 004, out of Maple"; fi
+
+# how many values taken, etc. ?
+nvals=`cat $tmp4 | gawk ' /NVALS/ { print $2 }'`
+maxval=`cat $tmp4 | gawk ' /MAXVAL/ { print $2 }'`
+nterms=`cat $tmp4 | gawk ' /NTERMS/ { print $2 }'`
+f77type=`cat $tmp4 | gawk ' /F77TYPE/ { print $2 }'`
+if [ "$debug" -eq 1 ]; then echo "$nvals" "$maxval" "$nterms" "$f77type" > jonk004a; echo "at 004a"; fi
+
+if [ "$nvals" -le 1 ]
+then
+	(	echo
+		echo "REPLY to $addr :"
+		cat $ans
+		echo
+		echo "Constant sequence.  Bye!"
+		echo
+		)  >> $log
+	(	echo
+		echo "Constant sequence.  Bye!"
+		cat $D1/superfoot0
+		echo ) >>$ans
+(echo "To: $addr"; echo "Subject: Reply from superseeker";
+cat $ans ) | /usr/lib/sendmail -f superseq-reply "$addr"
+
+		exit 0
+fi
+
+
+#########################################################
+#
+#    		LOOK UP SEQUENCE IN TABLE
+#
+#########################################################
+
+# FIRST TRY THE TABLE: (uses $tmp (for input), $tmp2, and $tmp3 for the answer)
+# makes a copy of input, $tmp, in $tmp4
+
+if [ "$debug" -eq 1 ]; then cp $tmp jonk0049; echo "at 0049, start lookup"; fi
+
+cp $tmp $tmp4
+echo >$tmp3
+echo "TEST: IS THE SEQUENCE OF ABSOLUTE VALUES IN THE ENCYCLOPEDIA?" >>$tmp3
+
+###################################
+# look up all seqs that match - this is for a single lookup only!
+###################################
+
+#echo "at 49a"
+#cat $tmp | sed 's#^f ,#/home/njas/www-etc/oeis/bin/search
+#         -f 3 -q -n 50 /home/njas/www-etc/oeis/search.db \"#
+#                 s/,$/\"/' >$tmp5
+ta=`cat $tmp | sed 's/^f ,//
+                    s/,$//'`
+if [ "$debug" -eq 1 ]; then echo "at 0049aa, ta = $ta"; fi
+echo "Matches (up to a limit of 50) found for \"$ta\"" >>$tmp3
+echo "" >>$tmp3
+/home/njas/www-etc/oeis/bin/search -f 3 -q -n 50 /home/njas/www-etc/oeis/search.db "$ta" >>$tmp3
+echo "" >>$tmp3
+
+if [ "$debug" -eq 1 ]; then cp $tmp3 jonk005; echo "at 005, finished lookup"; fi
+
+if grep "%I" $tmp3 >/dev/null
+then
+# see how many hits
+nhits=`grep "%I" $tmp3 | wc -l | gawk '{print $1}'`
+intable=1
+(	echo
+	echo "        SUCCESS: the sequence is in the OEIS."
+	echo
+	) >>$tmp3
+cat $tmp3 >>$ans
+else
+nhits=0
+intable=0
+fi
+ntable=`expr $nhits`
+if [ "$debug" -eq 1 ]; then cp $tmp3 jonk00501; echo "at 00501, out of lookup"; fi
+
+############################################################
+#
+#           IS THE SHORTENED SEQUENCE IN THE TABLE?
+#
+############################################################
+
+# (uses $tmp (for input), $tmp2, and $tmp3 for the answer)
+
+if [ "$debug" -eq 1 ]; then echo "$intable, $nterms" >jonk00502; echo "at 00502, short lookup"; fi
+
+if [ $intable -eq 0 -a $nterms -ge 5 ] 					#if 0
+then									#then 0
+
+# reload $tmp from $tmp4 where it had been saved, deleting first term
+
+if [ "$debug" -eq 1 ]; then cp $tmp4 jonk00503; echo "at 00503, short "; fi
+
+cat $tmp4 | sed 's/,[0123456789]*,/,/' >$tmp
+
+if [ "$debug" -eq 1 ]; then cp $tmp jonk00504; echo "at 00504, edited"; fi
+
+echo >$tmp3
+echo "TEST: IS THE SEQUENCE OF ABSOLUTE VALUES
+(WITH FIRST TERM OMITTED) IN THE ENCYCLOPEDIA?" >>$tmp3
+
+###################################
+# look up all seqs that match - this is for a single lookup only!
+###################################
+
+ta=`cat $tmp | sed 's/^f ,//
+                    s/,$//'`
+if [ "$debug" -eq 1 ]; then echo "at 0049aa, ta = $ta"; fi
+
+echo "Matches (up to a limit of 50) found for \"$ta\"" >>$tmp3
+echo "" >>$tmp3
+/home/njas/www-etc/oeis/bin/search -f 3 -q -n 50 /home/njas/www-etc/oeis/search.db "$ta" >>$tmp3
+echo "" >>$tmp3
+
+if [ "$debug" -eq 1 ]; then cp $tmp3 jonk0051; echo "at 0051, finished lookup"; fi
+
+if grep "%I" $tmp3 >/dev/null
+then
+# see how many hits
+nhits=`grep "%I" $tmp3 | wc -l | gawk '{print $1}'`
+intable=1
+(	echo
+	echo "        SUCCESS: the sequence is in the OEIS."
+	echo
+	) >>$tmp3
+cat $tmp3 >>$ans
+else
+nhits=0
+fi
+ntable=`expr $nhits`
+if [ "$debug" -eq 1 ]; then cp $tmp3 jonk0052; echo "at 0052, finished lookup"; fi
+
+fi									#fi 0
+
+
+
+
+##############################################################
+#
+#                     AGREP
+#
+# Aug 01 1999:  adding calls to agrep to look for sequences
+# that almost match
+#
+##############################################################
+
+##############################################################
+#
+#                     AGREP_1
+#
+##############################################################
+
+# (uses $tmp4 (for input), $tmp5, and $tmp3 for the answer)
+
+if [ "$debug" -eq 1 ]; then echo "$intable, $nterms" >jonk005201; echo "at 005201, running agrep1 "; fi
+
+if [ $intable -eq 0 ]		 					#if 0
+then									#then 0
+
+# reload $tmp from $tmp4 where it had been saved with first term deleted
+# and convert it to agrep's format
+lis=`cat $tmp4 | sed 's/...//
+		      s/.$//'`
+
+if [ "$debug" -eq 1 ]; then echo "$lis" >jonk005202; echo "at 005202 "; fi
+
+echo >$tmp3
+echo "SUGGESTION: IT APPEARS THAT THE SEQUENCE OF ABSOLUTE VALUES
+CAN BE OBTAINED FROM THE FOLLOWING SEQUENCE(S) IN THE ENCYCLOPEDIA
+(UP TO A LIMIT OF $limans) BY 1 INSERTION, DELETION OR SUBSTITUTION:" >>$tmp3
+echo " " >> $tmp3
+
+# look up all seqs that match 
+
+$AGREP -1 -k "$lis" $stripped | sed "${limans}q" | 
+  gawk '$2~"^A" {print "cat /home/njas/gauss/hisdir/cat25 | grep \"^%[A-Za-z] " $2 "\"" }'  > $tmp5
+
+if [ "$debug" -eq 1 ]; then cp $tmp5 jonk005203; echo "at 005203, finished agrep_1 lookup"; fi
+
+# Pull out those A numbers from the table
+# and separate entries by spaces
+sh $tmp5 | sed '/^%I/i\
+
+' >>$tmp3
+
+if [ "$debug" -eq 1 ]; then cp $tmp3 jonk005204; echo "at 005204, finished sh "; fi
+
+# were there any hits?
+if grep "%I" $tmp3 >/dev/null
+then
+# see how many hits
+nhits=`grep "%I" $tmp3 | wc -l | gawk '{print $1}'`
+echo >>$tmp3
+cat $tmp3 >>$ans
+else
+nhits=0
+fi
+
+if [ "$debug" -eq 1 ]; then cp $tmp3 jonk005205; echo "at 005205, finished agrep_1 lookup"; fi
+if [ "$debug" -eq 1 ]; then echo "nhits = $nhits"; fi
+
+fi									#fi 0
+
+####################################################
+#           END OF AGREP_1
+####################################################
+
+##############################################################
+#
+#                     AGREP_2
+# IS IT DISTANCE 2 FROM SOME SEQUENCE?
+#
+##############################################################
+
+if [ "$nhits" -eq 0 ]							# if 1
+then									# then 1
+
+# (uses $tmp4 (for input), $tmp5, and $tmp3 for the answer)
+
+if [ "$debug" -eq 1 ]; then echo "$intable, $nterms" >jonk005211; echo "at 005211, running agrep2 "; fi
+
+if [ "$debug" -eq 1 ]; then echo "$lis" >jonk005212; echo "at 005212 "; fi
+
+echo >$tmp3
+echo "SUGGESTION: IT APPEARS THAT THE SEQUENCE OF ABSOLUTE VALUES
+CAN BE OBTAINED FROM THE FOLLOWING SEQUENCE(S) IN THE ENCYCLOPEDIA
+(UP TO A LIMIT OF $limans) BY 2 INSERTIONS, DELETIONS OR SUBSTITUTIONS:" >>$tmp3
+echo " " >> $tmp3
+
+# look up all seqs that match 
+
+$AGREP -2 -k "$lis" $stripped | sed "${limans}q" | 
+  gawk '$2~"^A" {print "cat /home/njas/gauss/hisdir/cat25 | grep \"^%[A-Za-z] " $2 "\"" }'  > $tmp5
+
+if [ "$debug" -eq 1 ]; then cp $tmp5 jonk005213; echo "at 005213, finished agrep_2 lookup"; fi
+
+# Pull out those A numbers from the table
+# and separate entries by spaces
+sh $tmp5 | sed '/^%I/i\
+
+' >>$tmp3
+
+if [ "$debug" -eq 1 ]; then cp $tmp3 jonk005214; echo "at 005214, finished shell command "; fi
+
+# were there any hits?
+if grep "%I" $tmp3 >/dev/null
+then
+# see how many hits
+nhits=`grep "%I" $tmp3 | wc -l | gawk '{print $1}'`
+echo >>$tmp3
+cat $tmp3 >>$ans
+else
+nhits=0
+fi
+
+if [ "$debug" -eq 1 ]; then cp $tmp3 jonk005215; echo "at 005215, finished agrep_2 lookup"; fi
+
+fi									# fi 1
+
+####################################################
+#           END OF AGREP_2
+####################################################
+
+
+##############################################################
+#
+#                     AGREP_3
+# IS IT DISTANCE 3 FROM SOME SEQUENCE?
+#
+##############################################################
+
+if [ "$nhits" -eq 0 ]							# if 1
+then									# then 1
+
+# (uses $tmp4 (for input), $tmp5, and $tmp3 for the answer)
+
+if [ "$debug" -eq 1 ]; then echo "$intable, $nterms" >jonk005211; echo "at 005211, running agrep_3 "; fi
+
+if [ "$debug" -eq 1 ]; then echo "$lis" >jonk005212; echo "at 005212 "; fi
+
+echo >$tmp3
+echo "SUGGESTION: IT APPEARS THAT THE SEQUENCE OF ABSOLUTE VALUES
+CAN BE OBTAINED FROM THE FOLLOWING SEQUENCE(S) IN THE ENCYCLOPEDIA
+(UP TO A LIMIT OF $limans) BY 3 INSERTIONS, DELETIONS OR SUBSTITUTIONS:" >>$tmp3
+echo " " >> $tmp3
+
+# look up all seqs that match 
+
+$AGREP -3 -k "$lis" $stripped | sed "${limans}q" | 
+  gawk '$2~"^A" {print "cat /home/njas/gauss/hisdir/cat25 | grep \"^%[A-Za-z] " $2 "\"" }'  > $tmp5
+
+if [ "$debug" -eq 1 ]; then cp $tmp5 jonk005213; echo "at 005213, finished agrep_3 lookup"; fi
+
+# Pull out those A numbers from the table
+# and separate entries by spaces
+sh $tmp5 | sed '/^%I/i\
+
+' >>$tmp3
+
+if [ "$debug" -eq 1 ]; then cp $tmp3 jonk005214; echo "at 005214, finished shell command "; fi
+
+# were there any hits?
+if grep "%I" $tmp3 >/dev/null
+then
+# see how many hits
+nhits=`grep "%I" $tmp3 | wc -l | gawk '{print $1}'`
+echo >>$tmp3
+cat $tmp3 >>$ans
+else
+nhits=0
+fi
+
+if [ "$debug" -eq 1 ]; then cp $tmp3 jonk005215; echo "at 005215, finished agrep_3 lookup"; fi
+
+fi									# fi 1
+
+####################################################
+#           END OF AGREP_3
+####################################################
+
+
+
+##############################################################
+#
+#                     LINDERMAN
+#
+# Oct 20 2003:  adding call to John P. Linderman's CheckSeq.pl program
+# to look for sequences that partailly overlap
+#
+##############################################################
+
+
+# skip this test if sequence in OEIS already
+if [ $intable -eq 0 ]                                  #if 0
+then                                                                    #then 0
+
+# (uses $tmp4 (for input), $tmp5, and $tmp3 for the answer)
+
+if [ "$debug" -eq 1 ]; then echo "$intable, $nterms" >jonk005221; echo "at 005221, running CheckSeq.pl "; fi
+
+lis=`cat $tmp4 | sed 's/..//'`
+
+if [ "$debug" -eq 1 ]; then echo "$lis" >jonk005222; echo "at 005222 "; fi
+
+echo >$tmp3
+echo "SUGGESTION: JOHN LINDERMAN'S PROGRAM CheckSeq.pl HAS DETECTED
+A PARTIAL OVERLAP BETWEEN YOUR SEQUENCE AND THE FOLLOWING SEQUENCE(S)
+(UP TO A LIMIT OF $limans) IN THE ENCYCLOPEDIA:" >>$tmp3
+echo " " >> $tmp3
+
+# look up all seqs that match 
+
+echo "$lis" | CheckSeq.pl | sed "${limans}q" | sed 's/://' |
+ gawk '$1~"^A" {print "cat /home/njas/gauss/hisdir/cat25 | grep \"^%[A-Za-z] " $1 "\"" }'  > $tmp5
+
+#echo "$lis" | CheckSeq.pl | sed "${limans}q" | sed 's/://' >$tmp5
+
+if [ -s $tmp5 ]					# if 1
+then					# then 1
+if [ "$debug" -eq 1 ]; then cp $tmp5 jonk005223; echo "at 005223, finished CheckSeq.pl"; fi
+
+# Pull out those A numbers from the table
+# and separate entries by spaces
+sh $tmp5 | sed '/^%I/i\
+
+' >>$tmp3
+
+if [ "$debug" -eq 1 ]; then cp $tmp3 jonk005224; echo "at 005224, finished sh "; fi
+
+# were there any hits?
+if grep "%I" $tmp3 >/dev/null
+then
+# see how many hits
+nhits=`grep "%I" $tmp3 | wc -l | gawk '{print $1}'`
+echo >>$tmp3
+cat $tmp3 >>$ans
+else
+nhits=0
+fi
+
+if [ "$debug" -eq 1 ]; then cp $tmp3 jonk005225; echo "at 005225, finished CheckSeq.pl"; fi
+
+fi							#fi 1
+
+fi							# fi 0
+
+####################################################
+#           END OF LINDERMAN
+####################################################
+
+
+######################################################
+#
+#         IS THIS A SERIOUS REQUEST?
+#
+######################################################
+
+noc=`wc -c $req | gawk '{ print $1}'`
+noc=`expr $noc \- 10 `
+now=`cat $req | tr ',' ' ' |wc -w | gawk '{ print $1}'`
+if [ "$noc" -lt "$nocmin" -o "$now" -lt $nowmin ]
+	then
+(       echo
+        echo "REPLY to $addr :"
+        cat $ans
+        echo
+	echo "We need at least $nocmin characters in the sequence
+(counting the separating blanks),
+and at least $nowmin terms, to do any further analysis"
+        echo
+)  >> $log
+(	echo
+	echo "We need at least $nocmin characters in the sequence
+(counting the separating blanks),
+and at least $nowmin terms, to do any further analysis"
+	cat $D1/superfoot0
+	echo ) >>$ans
+	# cat $ans | upasname=superseq-reply mail "$addr"
+#	cat $ans | /usr/lib/sendmail -f superseq-reply "$addr"
+(echo "To: $addr"; echo "Subject: Reply from superseeker";
+cat $ans ) | /usr/lib/sendmail -f superseq-reply "$addr"
+exit 0
+fi 
+
+
+#######################################################
+#
+#	 LOOK AT DIFFERENCES: is sequence a polynomial in n?
+#
+#######################################################
+
+
+# CALLS superproc1
+
+cat $req $D1/superproc1 | $MAPLE > $tmp2
+if [ "$debug" -eq 1 ]; then cp $tmp2 jonk006; echo "at 006, checked diffs"; fi
+
+$ex -s $tmp2 <<!
+g/^>/d
+g/^#/d
+g/^\$/d
+\$a
+
+.
+g/^byt/d
+w
+q
+!
+
+if grep "good" $tmp2 >/dev/null
+	then
+#get degree  and poly
+$ex -s $tmp2 <<!
+1,/good/d
+w
+q
+!
+deg=`cat $tmp2 | sed '1q' | gawk ' /deg/ {print $2 }'`
+	nhits=`expr $nhits + 1`
+	periodic=1
+	(	echo
+		echo "TEST: IS THE NTH TERM A POLYNOMIAL IN N?"
+		echo "        SUCCESS: nth term is nontrivial polynomial in n of"
+		cat $tmp2
+		echo 
+	)	>>$ans
+	# IS SEQUENCE TRIVIAL?
+		if [ "$deg" -le 2 ]
+		then
+	(	echo
+		echo "REPLY to $addr :"
+		cat $ans
+		echo "Sequence is a polynomial of degree at most 2.  Bye!"
+		echo
+		)  >> $log
+	(	echo
+		echo "Sequence is a polynomial of degree at most 2.  Bye!"
+		cat $D1/superfoot0
+		echo ) >>$ans
+		# cat $ans | upasname=superseq-reply mail "$addr"
+#		cat $ans | /usr/lib/sendmail -f superseq-reply "$addr"
+(echo "To: $addr"; echo "Subject: Reply from superseeker";
+cat $ans ) | /usr/lib/sendmail -f superseq-reply "$addr"
+		exit 0
+		fi
+else
+	periodic=0
+#	(	echo
+#		echo "TEST: IS THE NTH TERM A POLYNOMIAL IN N?"
+#		echo "        FAILURE "
+#		echo 
+#	)	>>$ans
+fi
+
+
+
+
+
+#######################################################
+#
+#     LOOK AT FAN OF DIFFERENCES
+#
+#######################################################
+
+
+# LOOK AT FAN OF DIFFERENCES: is any row essentially constant?
+# CALLS superprocfan
+
+if [ $periodic -eq 0 ]							#if 0
+then
+cat $req $D1/superprocfan | $MAPLE > $tmp2
+if [ "$debug" -eq 1 ]; then cp $tmp2 jonk0061; echo "at 0061, checked fan"; fi
+
+$ex -s $tmp2 <<!
+g/^>/d
+g/^#/d
+g/^\$/d
+\$a
+
+.
+g/^byt/d
+w
+q
+!
+
+if grep "SUCCESS" $tmp2 >/dev/null
+	then
+# extract answers
+$ex -s $tmp2 <<!
+v/SUCC/d
+g/,/s// /g
+g/\]/s//
+w
+q
+!
+if [ "$debug" -eq 1 ]; then cp $tmp2 jonk0062; echo "at 0062, end fan"; fi
+howfar=`cat $tmp2 | sed '1q' | gawk ' /SUCC/ {print $2 }'`
+stratum=`cat $tmp2 | sed '1q' | gawk ' /SUCC/ {print $3 }'`
+s1=`cat $tmp2 | sed '1q' | gawk ' /SUCC/ {print $4 }'`
+s2=`cat $tmp2 | sed '1q' | gawk ' /SUCC/ {print $5 }'`
+s3=`cat $tmp2 | sed '1q' | gawk ' /SUCC/ {print $6 }'`
+s4=`cat $tmp2 | sed '1q' | gawk ' /SUCC/ {print $7 }'`
+	nhits=`expr $nhits + 1`
+	periodic=1
+	(	echo
+echo "SUGGESTION: apparently the differences of order $stratum in the
+difference table of depth $howfar have become constant.
+If this is true then the next four terms of the sequence are:"
+echo "		 $s1, $s2, $s3, $s4"
+		echo 
+	)	>>$ans
+fi
+
+if [ "$debug" -eq 1 ]; then cp $tmp2 jonk0063; echo "at 0063, end fan"; fi
+
+fi									#fi 0
+
+
+
+#######################################################
+#
+#	 GET FORTRAN VERSION
+#
+#######################################################
+
+if [ "$debug" -eq 1 ]; then cp $req jonk007; echo "at 007, getting fortran"; fi
+if [ "$f77type" -eq 1 ] 
+then
+# Next 3 lines Oct 30 2007 to avoid ex troubles on prim
+echo "$nterms" >$fort
+cat $req | sed 's/lis....//
+              s/..$//' | tr "," "\012" >>$fort
+
+#cp $req $fort
+#$ex -s $fort <<!
+#a
+#
+#.
+#g/^....../s///
+#g/..\$/s///
+#g/,/s//\\
+#/g
+#g/ /s///g
+#g/^\$/d
+#0a
+#$nterms
+#.
+#w
+#q
+#!
+
+if [ "$debug" -eq 1 ]; then cp $fort jonk007a; echo "at 007a, have fort."; fi
+fi
+if [ "$debug" -eq 1 ]; then echo "$f77type" >jonk007aa; echo "at 007aa"; fi
+
+
+
+#######################################################
+#
+#	 TEST IF DIFFERENCES ARE PERIODIC - CALLS proc8
+#
+#######################################################
+
+if [ "$f77type" -eq 1 -a $nvals -gt 2 ]					#if 0
+then
+cat $fort | $PROC8 >$tmp
+if  grep "SUCCESS" $tmp > /dev/null					#if 1
+then
+periodic=1
+nhits=`expr $nhits + 1`
+cat $tmp | sed 's/SUCCESS/SUGGESTION/g' >>$ans
+if [ "$debug" -eq 1 ]; then cp $tmp jonk007b; echo "at 007b, diffs periodic"; fi
+fi									#fi 1
+fi									#fi 0
+
+
+
+
+################################################################3
+#
+#              A BINARY SEQUENCE
+#
+################################################################3
+
+# IF BINARY, LOOKUP CHAR FNS - CALLS proc9
+
+if [ $f77type -eq 1 -a $nvals -eq 2 ]                                   #if 0
+then
+
+cat $fort | $PROC9 >$tmp
+# $tmp holds the output from the fortran program
+
+if [ "$debug" -eq 1 ]; then cp $tmp jonk007c; echo "at 007c, binary seq"; fi
+if  grep "FAIL" $tmp > /dev/null						# if 1
+then
+:
+else									# else 1
+	if grep "trivial" $tmp >/dev/null				# if 2
+	then
+$ex -s $tmp <<!
+1,/CUT/d
+w
+q
+!
+if [ "$debug" -eq 1 ]; then cp $tmp jonk007d; echo "at 007d, triv. binary"; fi
+        (       echo
+                echo "REPLY to $addr :"
+                cat $ans
+                echo
+                )  >> $log
+        (       echo
+                cat $tmp
+                echo ) >>$ans
+(echo "To: $addr"; echo "Subject: Reply from superseeker";
+cat $ans ) | /usr/lib/sendmail -f superseq-reply "$addr"
+                exit 0
+	fi								# fi 2
+# nontrivial return from proc9
+cp $tmp $tmp2
+$ex -s $tmp <<!
+1,/CUT/d
+/LAST/,\$d
+w
+q
+!
+cat $tmp >>$ans
+if [ "$debug" -eq 1 ]; then cp $tmp jonk007e; echo "at 007e, nontriv binary"; fi
+# now extract the seqs
+cp $tmp2 $tmp
+$ex -s $tmp <<!
+1,/INTRO/d
+/ZZZZ/,\$d
+g/ /s///g
+g/^f,/s///
+g/,$/s///
+w
+q
+!
+if [ "$debug" -eq 1 ]; then cp $tmp jonk007f; echo "at 007f"; fi
+
+# build up this section of reply in $tmp3
+
+echo >$tmp3
+
+###################################
+# look up all seqs that match - this is for multiple lookups
+###################################
+
+:>$tmp3
+cat $tmp | while read ta; do
+echo "" >>$tmp3
+echo "Matches (up to a limit of 50) found for \"$ta\"" >>$tmp3
+echo "" >>$tmp3
+/home/njas/www-etc/oeis/bin/search -f 3 -q -n 50 /home/njas/www-etc/oeis/search.db "$ta" >>$tmp3
+echo "" >>$tmp3
+done
+
+if [ "$debug" -eq 1 ]; then cp $tmp3 jonk007g; echo "at 007g, looked up bins."; fi
+
+if grep "%I" $tmp3 >/dev/null						#fi 2
+then
+# see how many hits
+nfound=`grep "%I" $tmp3 | wc -l | gawk '{print $1}'`
+intable=1
+(	echo
+	echo "        SUCCESS: the sequence is in the OEIS."
+	echo
+	) >>$tmp3
+else									# else 2
+nfound=0
+(	echo
+	echo "        none are in the OEIS. "
+	echo
+)	 >>$tmp3
+fi									# fi 2
+
+nhits=`expr $nhits + $nfound`
+cat $tmp3 >>$ans
+if [ "$debug" -eq 1 ]; then cp $tmp3 jonk007h; echo "at 007h, done with binary"; fi
+fi									#fi 1
+
+fi									#fi 0
+
+
+# was it in OEIS?  if not, ask them to send it
+if [ "$intable" -eq 0 ]
+then
+cat $footer2 >>$ans
+fi
+
+
+################################################################
+#           END OF BINARY SECTION
+################################################################
+
+
+
+################################################################
+#
+#                  GUESSGF
+#
+################################################################
+
+# TRY GUESSGF  (uses $tmp, $tmp2, and $tmp3 for answer )
+# CALLS superproc2fry
+
+ohits=$nhits
+if [ "$debug" -eq 1 ]; then cp $req jonk008; echo "at 008, gfun"; fi
+#echo "TEST: LOOK FOR A GENERATING FUNCTION (WITH GFUN)" >$tmp3
+cat $req $PROC2 >$tmp
+if [ "$debug" -eq 1 ]; then cp $tmp jonk008a; echo "at 008a, gfun"; fi
+(ulimit -t $maptime;  $MAPLE <$tmp >$tmp2 )
+
+if test $? -eq 0 
+then
+
+if [ "$debug" -eq 1 ]; then cp $tmp2 jonk008b; echo "at 008b, gfun ran ok"; fi
+$ex -s $tmp2 <<!
+1,/guessgf/d
+g/^>/d
+g/^#/d
+g/^\$/d
+\$a
+
+.
+g/^byt/d
+g/FAIL/d
+g/rror/d
+g/rong/d
+w
+q
+!
+# see how many hits:
+nfound=`grep "gf" $tmp2 | wc -l | gawk '{print $1}'`
+
+if [ "$nfound" -eq 0 ]
+	then
+	:
+#	(	echo
+#		echo "        FAILURE"
+#		echo 
+#	)	>>$ans
+else
+	nhits=`expr $nhits + $nfound`
+	(	echo
+	echo "SUGGESTION: GUESSGF FOUND ONE OR MORE GENERATING FUNCTIONS"
+	echo "WARNING: THESE MAY BE ONLY APPROXIMATIONS!" 
+		echo "Generating function(s) and type(s) are:"
+		echo
+		cat $tmp2
+		echo 
+	)	>>$ans
+fi
+
+else
+if [ "$debug" -eq 1 ]; then cp $req jonk008c; echo "at 008c, gfun died"; fi
+fi
+
+#############################################################
+#      END OF GUESSGF
+#############################################################
+
+
+
+
+#######################################################
+#
+#               TRY LISTTOREC
+#
+#######################################################
+
+# TRY LISTTOREC - CALLS superproc4fry
+
+#echo "TEST: LOOK FOR A RECURRENCE (WITH LISTTOREC)" >>$ans
+(ulimit -t $maptime; cat $req $PROC4 | $MAPLE > $tmp2 )
+
+if test $? -eq 0 
+then
+
+if [ "$debug" -eq 1 ]; then cp $tmp2 jonk009; echo "at 009, listtorec ran ok"; fi
+$ex -s $tmp2 <<!
+1,/listtorec/d
+g/^>/d
+g/^#/d
+g/^\$/d
+\$a
+
+.
+g/^byt/d
+g/FAIL/d
+g/rror/d
+g/rong/d
+w
+q
+!
+if [ "$debug" -eq 1 ]; then cp $tmp2 jonk009a; echo "at 009a,in  listtorec"; fi
+# see how many hits:
+nfound=`grep "gf" $tmp2 | wc -l | gawk '{print $1}'`
+
+if [ "$nfound" -eq 0 ]
+	then
+	:
+#	(	echo
+#		echo "        FAILURE"
+#		echo 
+#	)	>>$ans
+else
+	nhits=`expr $nhits + $nfound`
+	(	echo
+		echo "SUGGESTION: LISTTOREC FOUND ONE OR MORE RECURRENCES"
+		echo "WARNING: THESE MAY BE ONLY APPROXIMATIONS!" 
+		echo "Recurrence(s) and type(s) are:"
+		echo
+		cat $tmp2
+		echo 
+	)	>>$ans
+fi
+
+else
+if [ "$debug" -eq 1 ]; then cp $req jonk009c; echo "at 009c, listtorec died"; fi
+fi
+
+
+
+
+#######################################################
+#
+#               TRY LISTTOALGEQ
+#
+#######################################################
+
+
+# TRY LISTTOALGEQ - CALLS superproc6fry
+
+if [ "$debug" -eq 1 ]; then cp $req jonk010; echo "at 010, listalgeq"; fi
+#echo "TEST: LOOK FOR AN ALGEBRAIC EQUATION SATISFIED BY THE GENERATING
+#FUNCTION (WITH LISTTOALGEQ)" >>$ans
+cat $req $PROC6 >$tmp
+if [ "$debug" -eq 1 ]; then cp $tmp jonk010a; echo "at 010a, listalgeq"; fi
+(ulimit -t $maptime;  $MAPLE <$tmp >$tmp5 )
+#$MAPLE <$tmp >$tmp5 
+if [ "$debug" -eq 1 ]; then cp $tmp5 jonk010aa; echo "at 010aa, listalgeq ended"; fi
+
+if test $? -eq 0 					#if 3
+then							#then 3
+
+if [ "$debug" -eq 1 ]; then cp $tmp5 jonk010b; echo "at 010b, listtoalgeq ran ok"; fi
+$ex -s $tmp5 <<!
+1,/listto/d
+g/^>/d
+g/^#/d
+g/^\$/d
+\$a
+
+.
+g/^byt/d
+g/FAIL/d
+g/rror/d
+g/rong/d
+w
+q
+!
+# see how many hits:
+nfound=`grep "gf" $tmp5 | wc -l | gawk '{print $1}'`
+
+if [ "$nfound" -eq 0 ]					#if 7
+	then						#then 7
+	:
+#	(	echo
+#		echo "        FAILURE"
+#		echo 
+#	)	>>$ans
+else							#else 7
+	nhits=`expr $nhits + $nfound`
+	(	echo
+		echo "SUGGESTION: LISTTOALGEQ FOUND ONE OR MORE ALGEBRAIC
+EQUATIONS SATISFIED BY THE GEN. FN."
+		echo "WARNING: THESE MAY BE ONLY APPROXIMATIONS!" 
+		echo "Equation(s) and type(s) are:"
+		echo
+		cat $tmp5
+		echo 
+	)	>>$ans
+fi							#fi 7
+
+# append types of gen fns?
+if [ $nhits -gt $ohits ]				#if 8
+then							#then 8
+cat $D1/superfoot1 >>$ans
+fi							#fi 8
+
+else							#else 3
+if [ "$debug" -eq 1 ]; then cp $req jonk010c; echo "at 010c, listalgeq died"; fi
+fi							#fi 3
+
+
+####################################################################
+#
+#                 GUESSS                                           #
+#
+####################################################################
+
+
+# TRY GUESSS  (uses $tmp, $tmp2, and $tmp3 for answer )
+# uses superguesss, lis_maple
+
+ohits=$nhits
+
+if [ "$debug" -eq 1 ]; then echo $lis_maple >jonk018; echo "at 018, starting guesss"; fi
+
+(echo $lis_maple; cat $D1/superguesss )>$tmp
+
+if [ "$debug" -eq 1 ]; then cp $tmp jonk018a; echo "at 018a, guesss"; fi
+
+:>$tmp2
+(ulimit -t $maptime;  $MAPLE <$tmp >$tmp2 )
+
+if [ "$debug" -eq 1 ]; then cp $tmp2 jonk018b; echo "at 018b, guesss finished"; fi
+
+if grep "^SUCCESS" $tmp2 >/dev/null							#if0
+then											#then0
+
+if [ "$debug" -eq 1 ]; then echo "at 018c, guesss succeeded"; fi
+
+$ex -s $tmp2 <<!
+1,/^SUCCESS/d
+g/^>/d
+g/^#/d
+g/^byt/d
+w
+q
+!
+
+if [ "$debug" -eq 1 ]; then cp $tmp2 jonk018d; echo "at 018d, "; fi
+
+	nhits=`expr $nhits + 1`
+	(	echo
+echo "TRY \"GUESSS\", HARM DERKSEN'S PROGRAM FOR GUESSING A GENERATING FUNCTION FOR A SEQUENCE."
+		echo
+echo "         Guesss - guess a sequence, by Harm Derksen (hderksen@math.mit.edu)"
+		echo
+		cat $tmp2
+		echo 
+	)	>>$ans
+
+if [ "$debug" -eq 1 ]; then cp $ans jonk018e; echo "at 018e "; fi
+
+else											#else0
+if [ "$debug" -eq 1 ]; then cp $req jonk018f; echo "at 018f, guesss failed"; fi
+fi											#fi0
+
+#############################################################
+#      END OF GUESSGF
+#############################################################
+
+
+
+
+
+####################################################################
+#                                                                #
+#                 RATE                                           #
+#                                                                #
+####################################################################
+
+
+# TRY RATE  (uses $req, $tmp, $tmp2, and $tmp3 for answer )
+# uses superrate.m, lis_maple
+# don't forget $req is the NAME of the file where the "f ,1,2,3,4," seq is stored!
+
+ohits=$nhits
+
+# don't even try if there is a 0 term
+if [ $zterm -eq 0 ]
+then								#then 2
+:
+else								#else 2
+
+lis_mma=`echo $lis_maple | sed 's/......//
+				s/..$//'`
+if [ "$debug" -eq 1 ]; then echo $lis_mma >jonk019; echo "at 019, starting rate"; fi
+
+# make a dummy output file in case rate dies
+echo "In[1]:=
+Out[4]//InputForm= {}
+
+In[5]:=
+Out[5]= back from rate
+" >$tmp
+
+(ulimit -t $maptime; echo " << superrate\`
+\"calling rate\"
+Ratekurz[
+$lis_mma
+]
+InputForm[Out[3]]
+\"back from rate\"
+Quit[]
+" | $MATH -batchout >$tmp )
+
+# save status
+if test $? -ne 0
+then
+zdied=1
+if [ "$debug" -eq 1 ]; then echo "RATE failed, exit status 1"; fi
+else
+zdied=0
+fi
+
+if [ "$debug" -eq 1 ]; then cp $tmp jonk019a; echo "at 019a, rate finished"; fi
+
+# see if have licence problems
+if grep "Contact Wolfram Research" $tmp >/dev/null
+then
+zdied=1
+if [ "$debug" -eq 1 ]; then echo "RATE: Mma failed, licence problems"; fi
+fi
+
+# see if it died because of premature termination
+lll=`wc $tmp | gawk '{print $1}'`
+if test $lll -lt 16
+then
+zdied=1
+if [ "$debug" -eq 1 ]; then echo "RATE: Mma failed, premature termination"; fi
+fi
+
+if test "$zdied" -eq 0				#if0
+then								#then 0
+
+$ex -s $tmp <<!
+1,/InputForm/-1d
+1s/.*= *//
+/{/s///
+/In\[5/,\$d
+/}/s///
+g/i0/s//n/g
+g/^\$/d
+w
+q
+!
+
+if [ "$debug" -eq 1 ]; then cp $tmp jonk019b; echo "at 019b, edited output (will get incomp. line mess.)"; fi
+
+len1=`cat $tmp | wc -c`
+
+if [ "$len1" -gt 0 ]						#if1
+then								#then1
+
+if [ "$debug" -eq 1 ]; then echo "at 019c, rate succeeded"; fi
+
+	nhits=`expr $nhits + 1`
+	(	echo
+echo "TRY \"RATE\", CHRISTIAN KRATTHENTALER'S MATHEMATICA PROGRAM FOR GUESSING A CLOSED FORM FOR A SEQUENCE."
+echo "(\"Rate\" is \"Guess\" in German. For a description of RATE, see"
+echo "http://radon.mat.univie.ac.at/People/kratt/rate/rate.html)"
+echo
+echo "RATE found the following formula for the nth term:"
+echo "Warning: as with all these guessing programs, this is only a suggestion!"
+		echo
+		cat $tmp
+		echo 
+	)	>>$ans
+
+if [ "$debug" -eq 1 ]; then cp $ans jonk019e; echo "at 019e "; fi
+
+else											#else1
+if [ "$debug" -eq 1 ]; then cp $req jonk019f; echo "at 019f, rate failed"; fi
+fi											#fi1
+
+fi											#fi0
+fi											#fi2
+#############################################################
+#      END OF RATE
+#############################################################
+
+
+
+
+#############################################################
+#
+#      HAVE WE DONE ENOUGH?
+#
+#############################################################
+
+if [ "$tough" -eq 0 ]							#if0
+then									#then0
+
+if [ "$nhits" -ge 9 -o "$intable" -eq 1 ]				#if1
+	then								#then1
+(       echo
+        echo "REPLY to $addr :"
+        cat $ans
+	echo "That is probably enough for now.  If this reply
+doesn't satisfy you, try again with more terms!" 
+        echo
+)  >> $log
+(	echo
+	echo "That is probably enough for now.  If this reply
+doesn't satisfy you, try again with more terms!" 
+	cat $D1/superfoot0
+	echo ) >>$ans
+#	cat $ans | /usr/lib/sendmail -f superseq-reply "$addr"
+(echo "To: $addr"; echo "Subject: Reply from superseeker";
+cat $ans ) | /usr/lib/sendmail -f superseq-reply "$addr"
+exit 0
+fi 									#fi1
+
+fi									#fi0
+
+if [ "$debug" -eq 1 ]; then echo "at 010d"; fi
+
+
+
+###########################################################################
+#
+#      APPLY VARIOUS TRANSFORMATIONS TO SEQUENCE                          #
+#
+###########################################################################
+
+# TRY FINDHARD - CALLS superproc3fry 
+# which was later replaced by Olivier Gerard's Mma stuff in superOlivF
+# Now replaced by seqtranslib.m
+
+# tmp3 initially has the Mma output, which will then be overwritten
+# tmp2 contains the 115 or so transformed sequences
+# tmp3 has the matches for one xfmd seq in long form
+# tmp will have the BIG report with all matches found in this section
+# tmp4 will contain the (<= 100 matches) report
+# ans (as above) is the message to be sent to the user
+
+# start report files for report for this section
+:>$tmp
+
+(	echo "TEST: APPLY VARIOUS TRANSFORMATIONS TO SEQUENCE AND LOOK IT
+UP IN THE ENCYCLOPEDIA AGAIN" 
+	echo
+	echo "        SUCCESS"
+	echo "        (limited to 100 matches):"
+	echo) >$tmp4
+
+if [ "$debug" -eq 1 ]; then echo "at 010e"; fi
+
+(ulimit -t $maptime;
+cat "$req" | sed 's/^....../theseq={/' | sed 's/..$/};/' ;
+  echo "Get[\"/home/njas/bin/seqtranslib.m\"];
+        WriteSeekerList[ SuperTrans[theseq], \$Output]; " ) | $MATH -batchout >$tmp3
+
+# see if have licence problems
+if grep "Contact Wolfram Research" $tmp3 >/dev/null
+then
+zdied=1
+if [ "$debug" -eq 1 ]; then echo "FINDHARD: Mma failed, licence problems"; fi
+else
+zdied=0
+fi
+
+# did it run?
+if test "$zdied" -eq 0                                        #if 0
+then                                                     #then 0
+
+cat $tmp3 | sed '/T/!d
+               /T001/s/^.*T/T/
+               /, /s//,/g' > $tmp2
+
+if [ "$debug" -eq 1 ]; then cp $tmp2 jonk10f_tmp2; cp $tmp3 jonk10f_tmp3; echo "at 010f"; fi
+
+##############################################
+# feed the transformed sequences to "search" command 
+##############################################
+
+#:>junkjunk
+
+cat $tmp2 | sort -t" " -u +1 -2 |        # remove duplicates
+   while read T S U; do      # T=transformation no., S=seq, U=null  # do_1
+#echo "$T" >>junkjunk
+#echo "$S" >>junkjunk
+#echo "$U" >>junkjunk
+#echo "" >>junkjunk
+# get length of transformed sequence S in chars
+len1=`echo "$S" | wc -c`
+#echo "len1 = $len1" >>junkjunk
+if [ "$len1" -gt 10 ]		# if_2
+then				# then_2
+#echo "at 010fa"
+echo "Transformation $T gave a match with the following sequences (up to a limit of 10):" >$tmp3
+#echo "at 010fb"
+$DB/search -f 3 -q -n 10 $DD $S >$tmp5
+#echo "at 010fc"
+cat $tmp5 >>$tmp3
+#echo "at 010fd"
+#echo "at 010fd" >>junkjunk
+#cat $tmp5 >>junkjunk
+#echo "at 010fe"
+# exit 0
+# were there any hits for this transformation?
+nhits=`cat $tmp3 | grep "%I" | wc -l`
+#echo "nhits = $nhits" >>junkjunk
+if [ "$nhits" -ge 1 ]		# if_3
+then				# then_3
+cat $tmp3 >>$tmp
+fi				# fi_3
+fi				# fi_2
+                     done          # done_1
+
+# at this point $tmp contains the long results of FINDHARD
+if [ "$debug" -eq 1 ]; then cp $tmp2 jonk011; cp $tmp jonk011FR; echo "at 011, math ran ok"; fi
+
+
+# how many hits?
+nfound=`grep "^%I" $tmp | wc -l | gawk '{print $1}'`
+
+#               start of "if" statement Annabel
+if [ $nfound -gt 0 ]
+then                        # "then" of Annabel
+# Yes, there were hits!
+# just keep the first 100 matches
+
+cat $tmp | gawk ' /%I/ { count = count + 1
+                         if ( count > 100 ) 
+                                exit 0
+                         else
+                                print }
+                $0 !~ /%I/ { print } ' >> $tmp4
+
+if [ "$debug" -eq 1 ]; then cp $tmp4 jonk013a; echo "at 013a"; fi
+
+nhits=`expr $nhits + $nfound`
+
+	# pull out T numbers and explain them:
+	echo  >>$tmp4
+	echo "List of transformations used:" >>$tmp4
+	cat $tmp4 | gawk ' /^Transf/ { print $2 }' | sort -u  >$tmp3
+	for i in `cat $tmp3`
+	do
+	grep -h "^$i" $D1/supertrans >>$tmp4
+	done
+	cat $D1/superfoot2 >>$tmp4
+
+	(	echo
+		cat $tmp4
+		echo 
+	)	>>$ans
+fi                               # the "fi" of Annabel
+
+fi							#fi 0
+
+if [ "$debug" -eq 1 ]; then cp $tmp4 jonk014; echo "at 014"; fi
+
+
+#############################################################
+#   END OF TRANSFORMATIONS SECTION                          #
+#############################################################
+
+
+
+
+
+# LOOK FOR CLOSE SEQS IN TABLE - CALLS supernear
+
+#### if [ "$intable" -eq 0 ]						# if 0
+#### then
+#### 
+#### # delete signs!
+#### cat $req | tr -d '\055' >$tmp
+#### # run Maple
+#### cat $tmp $D1/supernear | $MAPLE > $tmp2
+#### 
+#### if [ "$debug" -eq 1 ]; then cp $tmp2 jonk014; echo "at 014, L1 test"; fi
+#### # process the output
+#### ex - $tmp2 <<!
+#### 1,/CLOSEST/d
+#### g/^>/d
+#### g/^#/d
+#### g/^\$/d
+#### \$a
+#### 
+#### .
+#### g/^byt/d
+#### g/,/s///g
+#### g/AA/s/A 1//
+#### w
+#### q
+#### !
+#### 
+#### # at this point $tmp2 contains the results from Maple
+#### 
+#### # how many hits?
+#### nfound=`grep "HIT" $tmp2 | wc -l | gawk '{print $1}'`
+#### 
+#### if [ "$nfound" -eq 0 ]						#if 1
+#### 	then
+#### 	:
+#### #	(	echo
+#### #		echo "        FAILURE"
+#### #		echo
+#### #	)	>>$ans
+#### else								# else 1
+#### 	nhits=`expr $nhits + $nfound`
+#### 	# pull out A numbers , enter them in $tmp3
+#### 	rm -f $tmp4
+#### 	echo  >>$tmp2
+#### 	cat $tmp2 | gawk ' /HIT/ { print $2 }' | sort -u  >$tmp3
+#### 	# get corresponding sequences themselves, put in $tmp4
+#### 	for i in `cat $tmp3`
+#### 	do
+#### 	grep -h "^%[A-Za-z] $i" $files >>$tmp4
+#### 	done
+#### 
+#### # clean up $tmp2
+#### ex - $tmp2 <<!
+#### 0a
+#### TEST: ARE ANY SEQUENCES IN ENCYCLOPEDIA CLOSE IN L1 NORM?
+#### 
+#### SUCCESS
+#### (limited to 3 sequences):
+#### 
+#### .
+#### \$a
+#### 
+#### .
+#### g/HIT/s//L1 distance from sequence/
+#### g/A...... /s//&is /
+#### w
+#### q
+#### !
+#### 
+#### 	echo >>$tmp2
+#### 	echo "List of sequences mentioned:" >>$tmp2
+#### # separate entries by spaces
+#### ex - $tmp4 <<!
+#### a
+#### 
+#### References (if any):
+#### 
+#### .
+#### g/^%I/i \\
+#### 
+#### .
+#### w
+#### q
+#### !
+#### cat $tmp4 >>$tmp2
+#### 
+#### # look for references
+#### cat $tmp4 | gawk ' /^%R/ {
+#### for (i = 3; i <= NF; i = i + 1) print $i
+#### } ' | tr -cd " [a-z][A-Z][0-9]\012" |  sort -u | sed '/^[1-9]/'d >$tmp
+#### for i in `cat $tmp`
+#### do
+#### grep -h "^.$i" $shortbib $shortbib3 >>$tmp2
+#### done
+#### 
+#### 	(	echo
+#### 		cat $tmp2
+#### 		echo 
+#### 	)	>>$ans
+#### fi								# fi 1
+#### 
+#### fi								# fi 0
+#### 
+
+
+
+########################################################
+#
+#                  BEATTY TEST 
+#
+########################################################
+
+if [ "$debug" -eq 1 ]; then cp $req jonk015aaa; echo "at 015aaa, into beatty"; fi
+
+(ulimit -t $maptime; cat $req $D1/superbeattyprim | $MAPLE > $tmp2 )
+
+if test $? -eq 0 
+then
+
+if [ "$debug" -eq 1 ]; then cp $req jonk015aab; echo "at 015aab, beatty ran ok"; fi
+if [ "$debug" -eq 1 ]; then cp $tmp2 jonk015aac; echo "at 015aac"; fi
+
+# did it run?
+if grep "CUT" $tmp2 >/dev/null					#if 0
+then								# then 0
+# process the output
+$ex -s $tmp2 <<!
+1,/CUT/d
+g/^>/d
+g/^#/d
+g/^\$/d
+\$a
+
+.
+g/^byt/d
+g/,/s// /g
+w
+q
+!
+# at this point $tmp2 contains the results from Maple
+
+# how many hits?
+nfound=`grep "BEATTY" $tmp2 | wc -l | gawk '{print $1}'`
+if [ "$debug" -eq 1 ]; then echo $nfound >jonk015a; echo "at 015a"; fi
+
+if [ "$nfound" -eq 0 ]						#if 1
+	then							# then 1
+	:
+#	(	echo
+#		echo "        FAILURE"
+#		echo
+#	)	>>$ans
+else								# else 1
+	nhits=`expr $nhits + $nfound`
+echo "TEST: IS IT A BEATTY SEQUENCE?" >>$ans
+#echo "TEST: IS IT A BEATTY OR QUASI-LINEAR SEQUENCE?" >>$ans
+	echo >>$ans
+
+if grep -h "BEATTY0" $tmp2 >$tmp3
+then
+xxx=`cat $tmp3 | gawk ' { print $3 }'`
+echo SUGGESTION: This appears to be a Beatty sequence [nz] with z approximately "$xxx" >>$ans
+echo >>$ans
+fi
+
+#if grep -h "BEATTY1" $tmp2 >$tmp3
+#then
+#xxx=`cat $tmp3 | gawk ' { print $2 }'`
+#echo SUCCESS: Sequence of partial sums is a Beatty sequence [nz] with z approx "$xxx" >>$ans
+#echo >>$ans
+#fi
+
+#if grep -h "BEATTY2" $tmp2 >$tmp3
+#then
+#echo "SUCCESS: Sequence of partial sums is quasi-linear:
+#correlation with [1,2,3,...] exceeds .999" >>$ans
+#echo >>$ans
+#fi
+
+#if grep -h "BEATTY3" $tmp2 >$tmp3
+#then
+#echo "SUCCESS: Sequence is quasi-linear:
+#correlation with [1,2,3,...] exceeds .999" >>$ans
+#echo >>$ans
+#fi
+
+cat $D1/superfootb >>$ans
+
+fi								# fi 1
+fi								# fi 0
+
+
+else
+if [ "$debug" -eq 1 ]; then cp $req jonk015z; echo "at 015z, beatty died"; fi
+fi
+
+
+##########################################
+#   END OF BEATTY TEST
+##########################################
+
+
+#1112# # Nov 12 2008 I am trying commenting this out
+#1112# ##############################################################
+#1112# #
+#1112# #     DRIPPED TEST =  DIFFERENCE TABLE LOOKUP
+#1112# #
+#1112# # Jul 01 2004  Does sequence match the first difference table?
+#1112# #
+#1112# ##############################################################
+#1112# 
+#1112# 
+#1112# # skip this test if sequence in table already
+#1112# if [ $intable -eq 0 ]                                  #if 0
+#1112# then                                                                    #then 0
+#1112# 
+#1112# # (uses $reqa (for input), $tmp5, and $tmp3 for the answer)
+#1112# 
+#1112# if [ "$debug" -eq 1 ]; then echo "$intable, $nterms" >jonkdrip1; cp $reqa jonkd1a ; echo "at drip1, running dripped test "; fi
+#1112# 
+#1112# echo >$tmp3
+#1112# echo "SUGGESTION: YOUR SEQUENCE APPEARS TO MATCH THE FIRST DIFFERENCES
+#1112# OF THE FOLLOWING SEQUENCE(S) (UP TO A LIMIT OF $limans) IN THE ENCYCLOPEDIA:" >>$tmp3
+#1112# echo " " >> $tmp3
+#1112# 
+#1112# # look up all seqs that match 
+#1112# f(){
+#1112# echo " " >> $tmp3
+#1112# echo "Matches (up to a limit of 50) found for $* :" | tr "," " " >> $tmp3
+#1112# grep -h $* $dripped |
+#1112# awk '$2~"^A" {print "grep -h \"^%[A-Za-z] " $2 "\" $files" }' |
+#1112#         sed "${limans}q" |
+#1112# 	sh >> $tmp3
+#1112# }
+#1112# 
+#1112# . $reqa
+#1112# 
+#1112# if [ "$debug" -eq 1 ]; then cp $tmp3 jonkdrip2; echo "at drip2, finished lookup"; fi
+#1112# 
+#1112# # sort $tmp3 using $tmp5 as temp storage and $tmp6 to hold output
+#1112# gawk -v tf=$tmp5 '
+#1112# BEGIN { head = 1; inside = 0 }
+#1112# # header lines
+#1112# $0 !~ /^Matches/ && head == 1 { print; next }
+#1112# # first "Match"
+#1112# $0 ~ /^Matches/ && head == 1 { print; head = 0; inside = 1; nlines = 0; print("") > tf; next }
+#1112# # inside the message
+#1112# $0 !~ /^Matches/ && inside == 1 { print >>tf; nlines++; next }
+#1112# # a new Match appears
+#1112# $0 ~ /^Matches/ && inside == 1 { 
+#1112# 	if (nlines >= 4)
+#1112# 		system("hisarrange " tf)
+#1112# 	else
+#1112# 		print("")
+#1112# 	print; close(tf); nlines = 0; print("") > tf; next
+#1112# 			       }
+#1112# END { if (nlines >= 4)
+#1112# 	system("hisarrange " tf)
+#1112#       else
+#1112# 	print("")
+#1112#     }
+#1112# ' $tmp3 >$tmp6 
+#1112# 
+#1112# cp $tmp6 $tmp3
+#1112# 
+#1112# # separate entries by spaces
+#1112# $ex -s $tmp3 <<!
+#1112# g/^%I/i \\
+#1112# 
+#1112# .
+#1112# w
+#1112# q
+#1112# !
+#1112# 
+#1112# # were there any hits?
+#1112# if grep "%I" $tmp3 >/dev/null
+#1112# then
+#1112# # see how many hits
+#1112# nhits=`grep "%I" $tmp3 | wc -l | gawk '{print $1}'`
+#1112# (	echo
+#1112# 	echo "        SUCCESS: the sequence matches the differences of a sequence in the OEIS."
+#1112# 	echo
+#1112# 	) >>$tmp3
+#1112# cat $tmp3 >>$ans
+#1112# else
+#1112# nhits=0
+#1112# fi
+#1112# if [ "$debug" -eq 1 ]; then cp $tmp3 jonkdrip3; echo "at drip3, out of lookup"; fi
+#1112# 
+#1112# fi							# fi 0
+#1112# 
+#1112# 
+#1112# ####################################################
+#1112# #           END OF DRIPPED LOOKUP
+#1112# ####################################################
+
+
+
+###########################################################################
+#
+# APPLY VARIOUS TRANSFORMATIONS TO SEQUENCE AND CHECK AGAINST DRIPPED TABLE
+#
+###########################################################################
+
+# TRY FINDHARD - CALLS superproc3fry or rather Oliv stuff (2/98)
+# now replaced by Olivier's math stuff in superOlivF
+
+# APPLY VARIOUS TRANSFORMATIONS TO SEQUENCE AND LOOK IT
+# UP IN THE DIFFERENCE TABLE AGAIN
+# tmp3 initially has the Mma output but will then be overwritten
+# tmp2 contains the 115 or so transformed sequences
+# tmp3 has the matches for one xfmd seq in long form
+# tmp4 will contain the (<= 100 matches) report
+# tmp will have the BIG report
+# ans (as above) = message to user
+
+# start report files for report for this section
+:>$tmp
+
+(	echo "TEST: APPLY VARIOUS TRANSFORMATIONS TO SEQUENCE AND
+CHECK AGAINST FIRST DIFFERENCES OF SEQUENCES IN OEIS"
+	echo
+	echo "        SUCCESS"
+	echo "        (limited to 100 matches):"
+	echo) >$tmp4
+
+if [ "$debug" -eq 1 ]; then echo "at dript1 start of transforms+diff table "; fi
+
+(ulimit -t $maptime;
+cat "$req" | sed 's/^....../theseq={/' | sed 's/..$/};/' ;
+  echo "Get[\"/home/njas/bin/seqtranslib.m\"];
+        WriteSeekerList[ SuperTrans[theseq], \$Output]; " ) | $MATH -batchout >$tmp3
+
+# see if have licence problems
+if grep "Contact Wolfram Research" $tmp3 >/dev/null
+then
+zdied=1
+if [ "$debug" -eq 1 ]; then echo "FINDHARD (diffs): Mma failed, licence problems"; fi
+else
+zdied=0
+fi
+
+# did it run?
+if test "$zdied" -eq 0                                        #if 0
+then                                                     #then 0
+
+cat $tmp3 | sed '/T/!d
+               /T001/s/^.*T/T/
+               /, /s//,/g' > $tmp2
+
+if [ "$debug" -eq 1 ]; then cp $tmp2 jonkdript2; cp $tmp3 jonkdript2a; echo "at dript2"; fi
+
+# feed the transformed sequences to qk_fast 
+cat $tmp2 | sort -t" " -u +1 -2 |        # remove duplicates
+   while read T S U; do      # T=transformation no., S=seq, U=null  # do_1
+# get length of transformed sequence S in chars
+len1=`echo "$S" | wc -c`
+if [ "$len1" -gt 10 ]		# if_2
+then				# then_2
+$D1/qk_fast_drip "$S" >$tmp5
+# were there any hits for this transformation?
+nhits=`cat $tmp5 | grep "A" | wc -l`
+if [ "$nhits" -ge 1 ]		# if_3
+then				# then_3
+#expand: replace the qk_fast results with full sequences
+	echo Transformation "$T" gave a match with first differences of: >$tmp3
+	cat $tmp5 | while read dum1 Anum dum2
+		    do
+# next: do a show Anum here
+$DB/search -f 3 -q id:"$Anum" $S >$tmp5
+#grep "^.. $Anum" /home/njas/gauss/hisdir/cat25 >>$tmp3
+echo "" >>$tmp3
+	       	    done
+cat $tmp3 >>$tmp
+fi				# fi_3
+fi				# fi_2
+                     done          # done_1
+
+# at this point $tmp contains the long results of FINDHARD
+if [ "$debug" -eq 1 ]; then cp $tmp2 jonkdript3; cp $tmp jonkdript3a; echo "at dript3, math ran ok"; fi
+
+# how many hits?
+nfound=`grep "^%I" $tmp | wc -l | gawk '{print $1}'`
+
+#               start of "if" statement Annabel
+if [ $nfound -gt 0 ]
+then                        # "then" of Annabel
+# Yes, there were hits!
+# just keep the first 100 matches
+
+cat $tmp | gawk ' /%I/ { count = count + 1
+                         if ( count > 100 ) 
+                                exit 0
+                         else
+                                print }
+                $0 !~ /%I/ { print } ' >> $tmp4
+
+if [ "$debug" -eq 1 ]; then cp $tmp4 jonkdript4; echo "at dript4"; fi
+
+nhits=`expr $nhits + $nfound`
+
+	# pull out T numbers and explain them:
+	echo  >>$tmp4
+	echo "List of transformations used:" >>$tmp4
+	cat $tmp4 | gawk ' /^Transf/ { print $2 }' | sort -u  >$tmp3
+	for i in `cat $tmp3`
+	do
+	grep -h "^$i" $D1/supertrans >>$tmp4
+	done
+	cat $D1/superfoot2 >>$tmp4
+
+	(	echo
+		cat $tmp4
+		echo 
+	)	>>$ans
+fi                               # the "fi" of Annabel
+
+fi							#fi 0
+
+if [ "$debug" -eq 1 ]; then cp $tmp4 jonkdript5; echo "at dript5"; fi
+
+#############################################################
+#   END OF TRANSFORMATIONS+DRIPPED SECTION                          #
+#############################################################
+
+# FINISHED.  Send off reply
+
+if [ "$debug" -eq 1 ]; then cp $ans jonk999; echo "at 999"; fi
+
+(       echo
+        echo "REPLY to $addr :"
+        cat $ans
+        echo
+)  >> $log
+cat $D1/superfoot0 >>$ans
+(echo "To: $addr"; echo "Subject: Reply from superseeker";
+cat $ans ) | /usr/lib/sendmail -f superseq-reply "$addr"
+
+exit 0

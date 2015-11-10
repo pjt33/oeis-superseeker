@@ -1,0 +1,95 @@
+# superbeattyprim
+# Simon Plouffe's Beatty Sequence Checker.
+# version 1.3 : May 4th 1994
+# the calling procedure is :
+# if the sequence is : lt7:=[1,2,3,4,5,6,7,8,9,10];
+# then type : maxmin(lt7);
+# A Beatty sequence is one in which the n-th term is [nz],
+# where z is irrational.  The complementary sequence is [ny],
+# where 1/x + 1/y = 1.  Refs: N. J. A. Sloane,
+# Handbook of Integer Sequences, 1973, p. 29; R. Honsberger, Ingenuity
+# in Mathematics, 1970, p. 93.
+# If this is a Beatty sequence the value given for z will produce
+# the given terms, but is very far from being unique.
+# We define a sequence to be "quasi-linear" if its squared
+# correlation coeffient with the sequence of natural numbers 1,2,3,4,...
+# exceeds .999.  A Beatty sequence is necessarily quasilinear.
+
+# prim-ed Oct 30 2007, Nov 02 2007
+
+interface(prettyprint=false):
+interface(quiet=true):
+interface(screenwidth=320):
+printlevel:=2:
+#with(share): with(gfun):
+# to
+#libname := `/usr/njas/hisdir`,`/usr/local/tools/mapleV6/lib`;
+libname := `/usr/njas/hisdir`,`/usr/local/tools/mapleV11/lib`;
+with(gfun):
+
+# new version april 1997 from Simon Plouffe 
+# Super-Beatty program, test if there is an 'r squared' correlation
+# in a finite sequence. It returns the r-squared coefficient when
+# the correlation is > 0.999.
+# Author : Simon Plouffe May 5th, 1997.
+# Changed from earlier version to follow Maple changes in calling that
+# stats package function. The calling sequence of that function
+# is not standard in Maple notation and will probably have a bug eventually
+# if ever they change the syntax again.
+# A number of similar tests are done with finite differences.
+
+
+with(stats):
+Digits:=16:
+maxmin:=proc(s) local i,nn,aa,a2,k,m1,m2,m3,m4,dif1,dif2,som,ave;
+        k:=0.99999999999999;
+        aa:=s;
+        nn:=nops(aa);
+        a2:=s1(aa);
+            m1:=[seq(aa[i]/i,i=1..nn)];
+            m2:=[seq((aa[i]+k)/i,i=1..nn)];
+            m3:=[seq(a2[i]/i,i=1..nn)];
+            m4:=[seq((a2[i]+k)/i,i=1..nn)];
+                        dif1:=min(op(m2))-max(op(m1));
+                        dif2:=min(op(m4))-max(op(m3));
+            som:=(min(op(m2))+max(op(m1)))/2;
+            ave:=evalf(a2[nops(aa)]/nn);
+
+print(`CUT HERE`);
+if dif1>=0 then
+#print(` Beatty seq. generated with [n*X] : X =`, som ) fi;
+print(`BEATTY0 `,som) fi;
+
+#if evalf(stats[describe,linearcorrelation](reg(s))) > 0.999 and dif1 < 0 then
+##print (`Original sequence is quasi-linear of unknown generator.`) fi;
+#print (`BEATTY3 `,0) fi;
+#
+#if evalf(stats[describe,linearcorrelation](reg(s1(s)))) > 0.999 and dif2 < 0 then
+##print (`Sequence of partial sums is a quasi-linear seq.`,ave) fi;
+#print(`BEATTY2 `,0) fi;
+#
+#if dif2 >= 0 and evalf(stats[describe,linearcorrelation](reg(s1(s)))) > 0.999 then
+##print( `Sequence of partial sums is a Beatty seq. with [(n+1)*X] - [n*X] =`,ave) fi;
+#print(`BEATTY1 `,ave) fi;
+
+end:
+
+reg:=proc(s)
+local i,aa,nn,t;
+    aa := s;
+    nn := nops(aa);
+    t := [seq(i,i = 1 .. nn)];
+    RETURN(aa,t);
+end:
+
+s1:=proc(s)
+    local z,t1,t2,t3,t4;
+    t1:=listtoseries(s,z,ogf);
+    t2:=t1/(1-z);
+    t3:=series(%,z,nops(s));
+    t4:=seriestolist(t3);
+    RETURN(t4);
+end:
+
+maxmin(lis);
+quit;

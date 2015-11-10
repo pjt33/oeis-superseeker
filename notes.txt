@@ -1,0 +1,122 @@
+PART 1: THE EMAIL LOOKUP SERVER
+
+I include this because it uses Russ Cox's fast lookup - search.db -
+to test if a sequence is in the OEIS. In contrast, Superseeker,
+in Part 2, uses my old grep, which is much slower. If I had more
+time, I would switch over Superseeker to use search.db.
+
+Here is the program, called "hisP" 
+[Handbook of Integer Sequences lookup, prim version]
+
+It uses programs dehtml3 and getfrom2, which
+are described in more detail in Part 2.
+
+It also mentions some other files (e.g. stripped) which
+are not used at present.
+
+As emails addressed to "sequences@research.att.com" arrive, they are
+piped into this program.
+
+
+
+PART 2: SUPERSEEKER
+
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+&&&   
+&&&   Summary: Here is a summary of what Superseeker does:
+&&&   
+&&&   - Runs superprocfan (written by Mira Bernstein), 
+&&&       which repeatedly computes inverse binomial
+&&&       transform of the sequence (if these triangles are
+&&&       glued together they form a "fan" - see the Bernstein-Sloane
+&&&       paper on eigensequences). If any of these are recognizable,
+&&&       we have a formula.
+&&&   
+&&&   - Runs proc8 (compiled version of superproc8.f)
+&&&       which tests if differences of some order are periodic
+&&&   
+&&&   - If the sequence only takes two values, a and b say, i.e. is a "binary" sequence,
+&&&       proc9 (compiled version of superproc9.f) computes the
+&&&       six canonical associated sequences and looks them up in the OEIS. 
+&&&       The 6 sequences, all equivalent to the
+&&&       original are: replace a,b by 1,2; by 2,1; positions of a's,
+&&&       of b's; run lengths; and the derivative.
+&&&   
+&&&   - superproc2prim calls the "guessgf" parts of the "gfun" Maple package 
+&&&       of Bruno Salvy and Paul Zimmermann
+&&&       to look for generating functions.
+&&&       See 
+&&&       http://www.maplesoft.com/support/help/Maple/view.aspx?path=gfun
+&&&       or
+&&&       pictor.math.uqam.ca/~plouffe/articles/gfun.pdf 
+&&&       for more about gfun
+&&&   
+&&&   - superproc4prim calls the "listtorec" parts of the "gfun" Maple package 
+&&&       of Bruno Salvy and Paul Zimmermann
+&&&       to look for recurrences.
+&&&   
+&&&   - Uses Harm Derksen's program "superguesss" to try
+&&&       to guess a formula or recurrence.
+&&&       [Harm Derksen's program "guesss" uses Pade'-Hermite approximations
+&&&       - see http://www.maplesoft.com/CyberMath/share/guesss.html.
+&&&       That algorithm is described in:
+&&&       An algorithm to compute generalized Pade'-Hermite forms,
+&&&       Report 9403 (1994), Dept. of Math., Catholic University Nijmegen
+&&&       (available from http://www.math.lsa.umich.edu/~hderksen/preprints/pade.ps).]
+&&&   
+&&&   - Uses Christian Kratthentaler's Mathematica program Rate ("superrate.m") which tries to
+&&&       guess a closed form for a sequence ("rate" is "guess" in German).
+&&&       For a description of Rate, see
+&&&       http://radon.mat.univie.ac.at/People/kratt/rate/rate.html.
+&&&   
+&&&   - Apply many transformations to the sequence and look up
+&&&       the result in the OEIS.
+&&&       The transforms are performed using Mathematica, with the
+&&&       help of Olivier Gerard's program seqtranslib.m
+&&&       A list of the transforms used is in "supertrans".
+&&&   
+&&&   - Apply many transformations to the sequence and look up
+&&&       the result in a table of sequences formed
+&&&       by taking the first differences of all the sequences in the OEIS.
+&&&       Uses the compressed file of the difference sequences, "dripped".
+&&&       The transforms are performed using Mathematica, with the
+&&&       help of Olivier Gerard's program seqtranslib.m
+&&&       A list of the transforms used is in "supertrans".
+&&&   
+&&&   - superproc6prim calls the "listtoalgeq" parts of the "gfun" Maple package 
+&&&       of Bruno Salvy and Paul Zimmermann
+&&&       to look for algebraic equations
+&&&   
+&&&   - Uses superbeattyprim, written by Simon Plouffe,
+&&&       to test if the sequence is a Beatty sequence
+&&&   
+&&&   - Uses John Linderman's program CheckSeq.pl
+&&&       to see if the sequence has a partial overlap with
+&&&       any existing sequence
+&&&   
+&&&   - Uses the unix utility "agrep" to look for sequences in the OEIS
+&&&       that have edit distnce 1, 2 or 3 from the given sequence.
+&&&   
+&&&   - (Not used at present) runs "supercorr2" to look
+&&&       for sequences that are highly correlated with the given sequence.
+&&&   
+&&&   - Several other people have offered the OEIS their programs for guessing 
+&&&       a formula or explanation for a sequence, but I did not
+&&&       have time to incorporate them into Superseeker.
+&&&       Hopefully this can be done on the wiki version.
+&&&   
+&&&   Note that the file "superhelp.txt" included below
+&&&   gives another summary of what Superseeker does.
+&&&   
+&&&   
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+
+
+As emails addressed to "superseeker@research.att.com" arrive, they are
+piped into the program superhisP, and later are fed into superasstprim.
+
+
+
+superproc2prim calls the guessgf sections of gfun. gfun is not included here, since it is part of Maple.

@@ -1,0 +1,284 @@
+#!/bin/sh
+# superhisP  Program that automatically answers sequence queries,
+#   trying very hard to find an explanation 
+
+# N. J. A. Sloane 5/2/94
+# uses dehtml, dehtml3
+# all the hard stuff is done by $D1/superasstprim, called at the end of this
+
+# To debug this, set debug=1, comment out the trap command
+# and uncomment all the "if debug ..." statements
+# Then rm jank*, and do something like
+# cat hiswork67 | superhisP, where hiswork67 has 2 lines:
+# From njas
+# lookup 10 20 30 40 0 60 70 80 90 100 110
+# or
+# lookup 220 1210 6655 34243 180829 963886 5093737
+
+# fry version 7/12/96
+# modified 12.30.97 and 3.5.98 and 6/4/99
+# 8/2/99 drop all except first lookup line
+# 6/4/99 added extra lines to put a copy of submission into directory QUEUE. NO!
+# July 19 2002 Line 85 Superseeker broken - Mma not working!
+# Jul 22 2002 Fixed
+# Changed helper file Nov 05 2002
+# Changed "ex" to /bin/ex ; changed ex - to $ex -s ; Jun 10 2005
+# added awk script to strip off lines from spam guard - Jun 10 2005
+# prim-ed Oct 27 2007
+# changed awk to gawk, Oct 27 2007
+# prim version, Nov 09 2008
+# Adding queueing commands, Nov 17 2008
+# Changed a gre to grep, Jul 22 2009 - the filter for supergoodguys
+# wasn't working
+
+# set path
+PATH=:/home/njas/bin:/bin:/usr/bin:/usr/local/bin; export PATH
+
+# set parameters, file names etc.
+mach=`uname -n`
+case "$mach"
+in
+        "fry") GETFROM=/home/njas/bin/getfrom
+	TIMESTAMP=/home/njas/bin/IP27/timestamp
+	DEHTML=/home/njas/bin/dehtml
+	DEHTML3=/home/njas/bin/dehtml3F;;
+
+        "prim.research.att.com") GETFROM=/home/njas/bin/getfrom2
+	TIMESTAMP=/home/njas/bin/x86_64/timestamp
+	DEHTML=/home/njas/bin/dehtmlP
+	DEHTML3=/home/njas/bin/dehtml3P;;
+esac
+
+# temp Nov 02 2007
+#echo "mach = " $mach
+
+ex=/bin/ex              # choose the good ex
+debug=0			# set =1 for debugging
+limreq=1		# no. of requests permitted
+D1=/home/njas/bin	# define D1 to be this directory
+D2=/home/njas/tmp        # D2 is temp directory
+# define directory where jobs are to be queued
+D3=/home/njas/bin/QUEUE
+DA=/home/njas/www-etc/oeis
+DB=$DA/bin
+DD=$DA/search.db
+
+log=$D1/superlogP	# log is a log fileP
+helper=$D1/superhelp.txt	# helper is help file to send people
+orig=$D2/superorig.$$	# define orig to hold the original request
+req=$D2/superreq.$$	# define req to hold the requested sequence
+tmp=$D2/$$.tmp3		# tmp file
+polite=3600		# minimum time in secs between calls
+trap "rm -f $orig $tmp ; exit 0" 0 1 2
+			# cleanup when done or interrupted
+# $addr will have the return address
+
+cd $D1
+
+# CAPTURE THE INPUT
+cat > $tmp
+#if [ "$debug" -eq 1 ]; then cat $tmp >jank000 ; echo "at 000 saving input"; fi
+
+# log 
+(       echo
+        echo "NEW MESSAGE:"
+        echo
+	cat $tmp
+)  >> $log
+
+# GET RETURN ADDRESS USING A NETLIB UTILITY FOR SECURITY
+
+addr=`$GETFROM < $tmp`
+case X$addr in
+  X) echo " " >> $log
+     echo "bad guy" >> $log
+     echo " " >> $log
+     exit 0;;
+esac
+#if [ "$debug" -eq 1 ]; then echo $addr >jank001 ; echo "at 001 got address"; fi
+
+# added Dec 30 1997
+# the 4th sed command below deletes any html garbage lines <....
+
+#if [ "$debug" -eq 1 ]; then cat $tmp | $DEHTML3 >jank002 ; echo "at 002 testing dehtml3"; fi
+#if [ "$debug" -eq 1 ]; then cat $tmp | $DEHTML3 | $DEHTML >jank003 ; echo "at 003 testing DEHTML"; fi
+
+cat $tmp | $DEHTML3 | $DEHTML | gawk '
+BEGIN { good = 1 }
+/Content preview:/ { good = 0; next}
+/Content analysis details:/ { good = 1; next }
+good == 0 {next }
+{ print }
+' | sed 's/Look/look/
+	   s/look up/lookup/
+	   s/LOOKUP/lookup/
+	   s/=20$//
+	   s/=$//
+           /[Ss][Uu][Bb]/d
+           /^</d
+	   /^X-/d
+           /ail lookup/d
+           /lookup/q' >$orig
+#if [ "$debug" -eq 1 ]; then cp $orig jank004; echo "at 004, edited req."; fi
+
+# log the request
+(	echo 
+	echo "after i deleted lots of junk, the message now reads:"
+	echo 
+	cat $orig 
+)  >> $log
+
+# TIME STAMP THE MESSAGE
+
+timein=`$TIMESTAMP`
+#if [ "$debug" -eq 1 ]; then echo $timein >jank005 ; echo "at 005"; fi
+# temp
+#echo timein = $timein
+
+# IS FORMAT CORRECT?  IF NOT SEND "SUPERHELP"
+if grep lookup $orig >/dev/null
+then
+:
+else 
+(echo "To: $addr"; echo "Subject: Help file for Superseeker";
+cat $helper ) | /usr/lib/sendmail -f superseq-reply "$addr"
+
+(	echo 
+	echo "I sent the helper file to $addr " 
+	echo
+)  >> $log
+exit 0
+fi
+
+# PROCESS THE REQUEST # pull out the lookup line
+cp $orig $req
+#if [ "$debug" -eq 1 ]; then cp $req jank006; echo "at 006, editing"; fi
+
+# delete html lines, subject lines, lines containing extraneous letters
+$ex -s $req <<!
+g/^</d
+v/lookup/d
+g/[Ss][Uu][Bb]/d
+g/[abcdefghijmnqrstvzABCDEFGHIJKLMNOPQRSTUVWXYZ]/d
+g/^ /s/^  *//
+w!
+q
+!
+#if [ "$debug" -eq 1 ]; then cp $req jank007; echo "at 007, edited"; fi
+
+#CHECK THAT THERE AREN'T TOO MANY REQUESTS
+noreq=`grep lookup $req | wc -l`
+if [ "$noreq" -gt "$limreq" ]
+then
+#echo "Sorry, only $limreq lookup line allowed in message " |
+#	/usr/lib/sendmail -f superseq-reply "$addr"
+(echo "To: $addr"; echo "Subject: Too many lookups";
+echo "Sorry, only $limreq lookup line allowed in message ";
+echo "To get the help file, send an empty message to superseeker@research.att.com" ) | /usr/lib/sendmail -f superseq-reply "$addr"
+
+(	echo " " 
+	echo "Told them too many lookups! "
+	echo " "
+)	>> $log
+exit 0
+fi
+
+$ex -s $req <<!
+g/lookup/s/lookup//
+w!
+q
+!
+#if [ "$debug" -eq 1 ]; then cp $req jank008; echo "at 008, edited"; fi
+
+# CHECK FOR NON-NUMERIC CHARACTERS IN THE LOOKUP LINE
+if grep '[^-0123456789 ]' $req  >/dev/null
+then
+#echo "Sorry, lookup line may contain only digits, minus signs and blanks" |
+#	/usr/lib/sendmail -f superseq-reply "$addr"
+(echo "To: $addr"; echo "Subject: Illegal characters";
+echo "Sorry, lookup lines may contain only digits, minus signs and blanks";
+echo "To get the help file, send an empty message to superseeker@research.att.com" ) | /usr/lib/sendmail -f superseq-reply "$addr"
+
+echo "Told them only digits allowed! " >> $log
+exit 0
+fi
+#if [ "$debug" -eq 1 ]; then cp $req jank009; echo "at 009"; fi
+
+# FINALLY, DO THEY GET BY THE BOUNCER?
+# if $addr is on list of good guys, accept the request without further checking
+if echo $addr|fgrep -x -f $D1/supergoodguys >/dev/null		#if 1
+then							        # then 1
+	:
+else								# else 1
+# if a new user, set lasttime = 0
+cat supertracker | gawk '{ print $2 }' >$tmp
+if echo $addr|fgrep -x -f $tmp >/dev/null
+then
+ 	lasttime=`grep -h "$addr" $D1/supertracker |
+ 	   gawk '{ print $1 }' | sort -n -r | sed '1q' `
+else
+	lasttime=0
+fi 
+# temp
+#echo lasttime = $lasttime
+# see if it has been an hour since the last request
+ 	  difftime=`expr $timein - $lasttime `
+ 	  if [ "$difftime" -lt "$polite" ]			# if 3
+ 	  then							# then 3
+(echo "To: $addr"; echo "Subject: Too soon since last submission";
+echo "Sorry, because this program consumes a lot of computer time, I must";
+echo "ration its usage to one request per hour per user - please try again later.";
+echo "To get the help file, send an empty message to superseeker@research.att.com" ) | /usr/lib/sendmail -f superseq-reply "$addr"
+ 	  (	echo " " 
+ 		echo "Told them it was too soon since last submission"
+ 		echo " "
+ 	  )	>> $log
+# temp
+#echo difftime = $difftime
+#if [ "$debug" -eq 1 ]; then echo "$timein $lasttime $difftime" >jank010; echo "at 010, getting bounced"; fi
+ 	  exit 0
+ 	  fi							# fi 3
+ 
+fi								# fi 1
+
+#if [ "$debug" -eq 1 ]; then echo "$timein" "$lasttime" "$difftime" >jank011; echo "at 011, past door."; fi
+
+# build the reply
+# THEY GOT IN!
+# record this request in file supertracker
+echo $timein $addr >>$D1/supertracker
+
+# DO FURTHER PROCESSING
+
+$ex -s $req <<!
+g/^/s// /
+g/$/s// /
+g/ /s//,/g
+g/,/s/,,*/,/g
+g/^/s//f /
+w!
+!
+
+# CHECK QUEUED SUBMISSIONS
+
+queuesize=`/bin/ps -u njas | grep superasstprim | wc -l` 
+if [ "$queuesize" -ge 100 ]; then
+  (echo "To: $addr"; echo "Subject: Too many queued submissions";
+  echo "Sorry, the queue is currently full of submissions received ahead of yours."
+  echo "Please try again later.";
+  echo "To get the help file, send an empty message to superseeker@research.att.com" ) | /usr/lib/sendmail -f superseq-reply "$addr" njas@research.att.com
+ 	  (	echo " " 
+ 		echo "Told them the queue was full ($queuesize)"
+ 		echo " "
+ 	  )	>> $log
+  exit 0
+fi
+
+# $addr is the actual address, $req is the name of file with seq in it
+
+#if [ "$debug" -eq 1 ]; then cp $req jank999; echo "at 999, done"; fi
+
+
+nohup $D1/superasstprim $addr $req >> $log 2>&1 &
+
+exit 0

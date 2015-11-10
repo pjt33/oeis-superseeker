@@ -1,0 +1,61 @@
+# superprocfan   
+# Mira Bernstein's program for multiple diff table (or fan ) test.
+# prim-ed Oct 30 2007
+
+interface(prettyprint=false): interface(quiet=true): interface(screenwidth=320):
+printlevel:=2:
+
+diffan:=proc(l,fanwidth,newterms) local howfar, stratum, i, j, k, t, hit, len:
+len:=nops(l): hit:=0: t[1][1]:=l:
+for k to fanwidth while hit=0 do
+	for i while pseudoconst(t[k][i]) = 0 do
+		t[k][i+1]:=[]:
+		for j from 2 to nops(t[k][i]) do
+			t[k][i+1]:=[op(t[k][i+1]), t[k][i][j]-t[k][i][j-1] ]:
+		od:
+	od:
+	if i<=len-1 then hit:=k:
+	howfar:=k:
+	stratum:=i-1:
+	else
+		t[k+1][1]:=[]:
+		for i to len do t[k+1][1]:=[op(t[k+1][1]),t[k][i][1]] od:
+	fi:
+od:
+
+if hit=0 then [FAILURE,0]
+else 
+	for j from 1 to newterms do
+		t[hit][i]:=[op(t[hit][i]),t[hit][i][len-i]]:
+	od:
+	for j from i-1 to 1 by -1 do 
+		t[hit][j]:= extendlist(t[hit][j],t[hit][j+1]): 
+	od:
+	for k from hit-1 to 1 by -1 do
+		for i from len+1 to len+newterms do t[k][i]:=[t[k+1][1][i]] od:
+		for i from len+newterms-1 to 1 by -1 do 
+			t[k][i]:=extendlist(t[k][i],t[k][i+1])
+		od:
+	od:
+[SUCCESS, howfar, stratum, t[1][1][len+1..len+newterms]];
+fi;
+end:
+
+extendlist:=proc(l1,l2)
+	local i,l;
+	l:=l1:
+	for i from nops(l1) to nops(l2) do l:=[op(l),op(i,l)+op(i,l2)] od:
+l;
+end:
+
+pseudoconst:=proc(l) local s,n:
+n:=nops(l):
+if n>5 then s:={op(l[n-2..n])} else
+	if n>1 then s:={op(l[n-1..n])} else s:={op(l)} fi:
+fi:
+if nops(s) = 1 then 1 else 0 fi:
+end:
+
+#print(`CUT HERE`);
+diffan(lis,10,4);   quit
+

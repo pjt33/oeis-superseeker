@@ -1,0 +1,27 @@
+# superproc2prim
+# CALLS GUESSGF
+# modified Apr 15 2000 to work with maple6
+# Oct 30 2007: I commented out the call to libname
+# Feb 09 2009, changed libname path 
+
+#with(share):
+#readshare(gfun,analysis):
+#libname := `/usr/njas/hisdir`,`/usr/local/tools/mapleV11/lib`;
+libname := `/home/njas/bin/gfun.lib.3.31`,`/usr/njas/hisdir`,libname:
+
+with(gfun):
+kernelopts(printbytes=false):
+l0:=3*length(lis):
+t1:=guessgf(lis,x,['ogf']):
+if  length(t1) < l0 then print(t1); fi:
+t1:=guessgf(lis,x,['egf']):
+if  length(t1) < l0 then print(t1); fi:
+t1:=guessgf(lis,y,['revogf']):
+if  length(t1) < l0 then print(t1); fi:
+t1:=guessgf(lis,y,['revegf']):
+if  length(t1) < l0 then print(t1); fi:
+t1:=guessgf(lis,x,['lgdogf']):
+if  length(t1) < l0 then print(t1); fi:
+t1:=guessgf(lis,x,['lgdegf']):
+if  length(t1) < l0 then print(t1); fi:
+quit

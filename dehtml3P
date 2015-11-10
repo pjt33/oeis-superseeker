@@ -1,0 +1,202 @@
+#!/bin/ksh
+# dehtml3P = dehtml3 for prim    Converts 8-bit extended ascii to simple english
+# checked Oct 26 2007
+
+# THIS IS USED BY hisP  and superhisP SO DON'T MESS WITH IT!
+
+#  Put (most of) all the weird characters into shell variables
+hA0=`echo -e '\0240'`
+hA1=`echo -e '\0241'`
+hA2=`echo -e '\0242'`
+hA3=`echo -e '\0243'`
+hA4=`echo -e '\0244'`
+hA5=`echo -e '\0245'`
+hA6=`echo -e '\0246'`
+hA7=`echo -e '\0247'`
+hA8=`echo -e '\0250'`
+hA9=`echo -e '\0251'`
+hAA=`echo -e '\0252'`
+hAB=`echo -e '\0253'`
+hAC=`echo -e '\0254'`
+hAD=`echo -e '\0255'`
+hAE=`echo -e '\0256'`
+hAF=`echo -e '\0257'`
+hB0=`echo -e '\0260'`
+hB1=`echo -e '\0261'`
+hB2=`echo -e '\0262'`
+hB3=`echo -e '\0263'`
+hB4=`echo -e '\0264'`
+hB5=`echo -e '\0265'`
+hB6=`echo -e '\0266'`
+hB7=`echo -e '\0267'`
+hB8=`echo -e '\0270'`
+hB9=`echo -e '\0271'`
+hBA=`echo -e '\0272'`
+hBB=`echo -e '\0273'`
+hBC=`echo -e '\0274'`
+hBD=`echo -e '\0275'`
+hBE=`echo -e '\0276'`
+hBF=`echo -e '\0277'`
+hC0=`echo -e '\0300'`
+hC1=`echo -e '\0301'`
+hC2=`echo -e '\0302'`
+hC3=`echo -e '\0303'`
+hC4=`echo -e '\0304'`
+hC5=`echo -e '\0305'`
+hC6=`echo -e '\0306'`
+hC7=`echo -e '\0307'`
+hC8=`echo -e '\0310'`
+hC9=`echo -e '\0311'`
+hCA=`echo -e '\0312'`
+hCB=`echo -e '\0313'`
+hCC=`echo -e '\0314'`
+hCD=`echo -e '\0315'`
+hCE=`echo -e '\0316'`
+hCF=`echo -e '\0317'`
+hD0=`echo -e '\0320'`
+hD1=`echo -e '\0321'`
+hD2=`echo -e '\0322'`
+hD3=`echo -e '\0323'`
+hD4=`echo -e '\0324'`
+hD5=`echo -e '\0325'`
+hD6=`echo -e '\0326'`
+hD7=`echo -e '\0327'`
+hD8=`echo -e '\0330'`
+hD9=`echo -e '\0331'`
+hDA=`echo -e '\0332'`
+hDB=`echo -e '\0333'`
+hDC=`echo -e '\0334'`
+hDD=`echo -e '\0335'`
+hDE=`echo -e '\0336'`
+hDF=`echo -e '\0337'`
+hE0=`echo -e '\0340'`
+hE1=`echo -e '\0341'`
+hE2=`echo -e '\0342'`
+hE3=`echo -e '\0343'`
+hE4=`echo -e '\0344'`
+hE5=`echo -e '\0345'`
+hE6=`echo -e '\0346'`
+hE7=`echo -e '\0347'`
+hE8=`echo -e '\0350'`
+hE9=`echo -e '\0351'`
+hEA=`echo -e '\0352'`
+hEB=`echo -e '\0353'`
+hEC=`echo -e '\0354'`
+hED=`echo -e '\0355'`
+hEE=`echo -e '\0356'`
+hEF=`echo -e '\0357'`
+hF0=`echo -e '\0360'`
+hF1=`echo -e '\0361'`
+hF2=`echo -e '\0362'`
+hF3=`echo -e '\0363'`
+hF4=`echo -e '\0364'`
+hF5=`echo -e '\0365'`
+hF6=`echo -e '\0366'`
+hF7=`echo -e '\0367'`
+hF8=`echo -e '\0370'`
+hF9=`echo -e '\0371'`
+hFA=`echo -e '\0372'`
+hFB=`echo -e '\0373'`
+hFC=`echo -e '\0374'`
+hFD=`echo -e '\0375'`
+hFE=`echo -e '\0376'`
+hFF=`echo -e '\0377'`
+
+# run sed to do the conversion
+sed "s/${hA0}/ /g
+s/${hA1}/!/g
+s/${hA2}/c/g
+s/${hA3}/L/g
+s/${hA4}/o/g
+s/${hA5}/Y/g
+s/${hA6}/|/g
+s/${hA7}/ss/g
+s/${hA8}/\"/g
+s/${hA9}/C/g
+s/${hAA}/@/g
+s/${hAB}/\"/g
+s/${hAC}/!/g
+s/${hAD}/-/g
+s/${hAE}/R/g
+s/${hAF}/-/g
+s/${hB0}/deg/g
+s/${hB1}/+-/g
+s/${hB2}/^2/g
+s/${hB3}/^3/g
+s/${hB4}/\'/g
+s/${hB5}/mu/g
+s/${hB6}/ /g
+s/${hB7}/./g
+s/${hB8}/ /g
+s/${hB9}/^1/g
+s/${hBA}/o/g
+s/${hBB}/\"/g
+s/${hBC}/1\/4/g
+s/${hBD}/1\/2/g
+s/${hBE}/3\/4/g
+s/${hBF}/?/g
+s/${hC0}/A/g
+s/${hC1}/A/g
+s/${hC2}/A/g
+s/${hC3}/A/g
+s/${hC4}/A/g
+s/${hC5}/A/g
+s/${hC6}/AE/g
+s/${hC7}/C/g
+s/${hC8}/E/g
+s/${hC9}/E/g
+s/${hCA}/E/g
+s/${hCB}/E/g
+s/${hCC}/I/g
+s/${hCD}/I/g
+s/${hCE}/I/g
+s/${hCF}/I/g
+s/${hD0}/TH/g
+s/${hD1}/N/g
+s/${hD2}/O/g
+s/${hD3}/O/g
+s/${hD4}/O/g
+s/${hD5}/O/g
+s/${hD6}/O/g
+s/${hD7}/*/g
+s/${hD8}/O/g
+s/${hD9}/U/g
+s/${hDA}/U/g
+s/${hDB}/U/g
+s/${hDC}/U/g
+s/${hDD}/Y/g
+s/${hDE}/TH/g
+s/${hDF}/ss/g
+s/${hE0}/a/g
+s/${hE1}/a/g
+s/${hE2}/a/g
+s/${hE3}/a/g
+s/${hE4}/a/g
+s/${hE5}/a/g
+s/${hE6}/ae/g
+s/${hE7}/c/g
+s/${hE8}/e/g
+s/${hE9}/e/g
+s/${hEA}/e/g
+s/${hEB}/e/g
+s/${hEC}/i/g
+s/${hED}/i/g
+s/${hEE}/i/g
+s/${hEF}/i/g
+s/${hF0}/th/g
+s/${hF1}/n/g
+s/${hF2}/o/g
+s/${hF3}/o/g
+s/${hF4}/o/g
+s/${hF5}/o/g
+s/${hF6}/o/g
+s/${hF7}/\//g
+s/${hF8}/o/g
+s/${hF9}/u/g
+s/${hFA}/u/g
+s/${hFB}/u/g
+s/${hFC}/u/g
+s/${hFD}/y/g
+s/${hFE}/th/g
+s/${hFF}/y/g
+"
